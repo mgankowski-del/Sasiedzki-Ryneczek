@@ -20,15 +20,6 @@ let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 
-const getRem = (name, total, res) => {
-    let reserved = 0;
-    res.forEach(r => {
-        const item = r.items.find(i => i.name === name);
-        if (item) reserved += item.qty;
-    });
-    return Math.max(0, total - reserved);
-};
-
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-item-form glass-card-dark';
@@ -115,18 +106,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
             <div class="listing-header"><h3>Sprzedawca: ${d.sellerName}</h3><p>📍 ${d.address} | ⏰ ${d.pickupTimes}</p></div>
-            ${d.items.map(it => {
-                const rem = getRem(it.name, it.totalQty, d.reservations);
-                return `
-                <div class="product-item-list">
-                    ${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} 
-                    <div style="flex:1">
-                        <b>${it.name}</b><br>
-                        <small style="color:#64748b">Cena: ${it.price} zł / ${it.unit} | Krok: ${it.step}</small><br>
-                        <small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${rem} ${it.unit}</small>
-                    </div>
-                </div>`;
-            }).join('')}
+            ${d.items.map(it => `<div class="product-item-list">${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} <div><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small></div></div>`).join('')}
             <div class="card-footer">
                 <button class="btn-primary" onclick="openOrderModal('${id}')">🛒 Zamów / Zmień</button>
                 <button class="btn-manage" onclick="authSeller('${id}', '${d.pin}')">⚙️ Panel</button>
@@ -139,24 +119,54 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
 window.openOrderModal = async (id, editIdx = null) => {
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data();
+    cachedListingData = d; // Dla funkcji wyszukiwania
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
     
     d.items.forEach((it) => {
         const row = document.createElement('div'); row.className = 'product-item-list';
-        const startVal = (editIdx !== null) ? (d.reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
-        row.innerHTML = `
-            <span style="flex:1">${it.name}</span>
-            <div class="qty-control">
-                <button class="qty-btn" onclick="this.nextElementSibling.stepDown(); updateSum()">-</button>
-                <input type="number" class="order-qty" data-price="${it.price}" step="${it.step}" value="${startVal}" min="0" onchange="updateSum()" readonly>
-                <button class="qty-btn" onclick="this.previousElementSibling.stepUp(); updateSum()">+</button>
-            </div>
-        `;
+        row.innerHTML = `<span style="flex:1">${it.name}</span><div class="qty-control"><button class="qty-btn" onclick="this.nextElementSibling.stepDown(); updateSum()">-</button><input type="number" class="order-qty" data-name="${it.name}" data-price="${it.price}" step="${it.step}" value="0" min="0" onchange="updateSum()" readonly><button class="qty-btn" onclick="this.previousElementSibling.stepUp(); updateSum()">+</button></div>`;
         container.appendChild(row);
     });
+
+    document.getElementById('buyerName').value = '';
+    document.getElementById('buyerPin').value = '';
+    document.getElementById('buyerPickupTime').value = '';
+    document.getElementById('buyer-status-msg').innerText = "💡 Podaj imię i PIN, by złożyć zamówienie.";
+    document.getElementById('buyer-status-msg').className = "info-text";
+
     document.getElementById('reservation-modal').classList.remove('hidden');
     updateSum();
 };
+
+// FUNKCJA ODSZUKIWANIA ZAMÓWIENIA NA ŻYWO
+const lookUpOrder = () => {
+    const name = document.getElementById('buyerName').value.trim().toLowerCase();
+    const pin = document.getElementById('buyerPin').value.trim();
+    const msg = document.getElementById('buyer-status-msg');
+
+    if (name.length > 2 && pin.length === 4) {
+        const existing = cachedListingData.reservations.find(r => r.buyerName.toLowerCase() === name && r.buyerPin === pin);
+        
+        if (existing) {
+            msg.innerText = "✅ Witaj ponownie! Załadowaliśmy Twoje zamówienie. Możesz je teraz zmienić.";
+            msg.className = "info-text info-found";
+            document.getElementById('buyerPickupTime').value = existing.time;
+            
+            // Uzupełnij ilości
+            document.querySelectorAll('.order-qty').forEach(input => {
+                const foundItem = existing.items.find(i => i.name === input.dataset.name);
+                input.value = foundItem ? foundItem.qty : 0;
+            });
+            updateSum();
+        } else {
+            msg.innerText = "💡 Składasz nowe zamówienie. Zapamiętaj ten PIN do późniejszych zmian!";
+            msg.className = "info-text";
+        }
+    }
+};
+
+document.getElementById('buyerName').oninput = lookUpOrder;
+document.getElementById('buyerPin').oninput = lookUpOrder;
 
 window.updateSum = () => {
     let total = 0; document.querySelectorAll('.order-qty').forEach(i => total += parseFloat(i.value || 0) * parseFloat(i.dataset.price));
@@ -168,29 +178,24 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerPin = document.getElementById('buyerPin').value.trim();
     const time = document.getElementById('buyerPickupTime').value;
     const items = []; 
-    document.querySelectorAll('.order-qty').forEach((input, idx) => {
+    document.querySelectorAll('.order-qty').forEach((input) => {
         const q = parseFloat(input.value);
-        if(q > 0) items.push({ name: document.querySelectorAll('.product-item-list span')[idx].innerText, qty: q });
+        if(q > 0) items.push({ name: input.dataset.name, qty: q });
     });
 
-    if(!buyerName || !buyerPin || items.length === 0) return alert("Wypełnij imię, PIN i wybierz produkty!");
+    if(!buyerName || buyerPin.length !== 4 || items.length === 0) return alert("Wypełnij imię, 4-cyfrowy PIN i wybierz produkty!");
 
     const refListing = doc(db, "listings", currentEditId); 
     const snap = await getDoc(refListing);
     let res = snap.data().reservations;
 
-    // LOGIKA ODSZUKIWANIA / ZMIANY ZAMÓWIENIA
     const existingIndex = res.findIndex(r => r.buyerName.toLowerCase() === buyerName.toLowerCase());
     
-    if (existingIndex !== -1 && editingResIndex === null) {
+    if (existingIndex !== -1) {
         if (res[existingIndex].buyerPin !== buyerPin) {
-            return alert("To imię jest już zajęte. Jeśli to Twoje zamówienie – podaj poprawny PIN. Jeśli nie – użyj innego imienia (np. dodaj nazwisko).");
+            return alert("Błędny PIN dla tego imienia!");
         }
-        if (!confirm("Odnaleziono Twoje zamówienie. Czy chcesz zapisać nową wersję?")) return;
         res[existingIndex] = { buyerName, buyerPin, time, items };
-    } else if (editingResIndex !== null) {
-        // Zmiana z poziomu Panelu Sprzedawcy (on ma PIN ogłoszenia, więc może)
-        res[editingResIndex] = { buyerName, buyerPin: res[editingResIndex].buyerPin, time, items };
     } else {
         res.push({ buyerName, buyerPin, time, items });
     }
@@ -220,7 +225,7 @@ const renderSellerView = (type) => {
                 return `<div class="res-sub-item"><span>${i.name} (${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
             }).join('');
             const group = document.createElement('div'); group.className = 'res-group';
-            group.innerHTML = `<div class="res-group-title">👤 ${r.buyerName}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">⏰ ${r.time}</div>${itemsRows}<div class="res-total">Do zapłaty: ${pTotal.toFixed(2)} zł</div><button onclick="openOrderModal('${currentEditId}', ${idx})" style="background:#f59e0b; color:white; border:none; border-radius:5px; padding:6px; margin-top:10px; cursor:pointer; font-size:0.8rem">Edytuj zamówienie</button>`;
+            group.innerHTML = `<div class="res-group-title">👤 ${r.buyerName}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">⏰ ${r.time}</div>${itemsRows}<div class="res-total">Suma: ${pTotal.toFixed(2)} zł</div><button onclick="openOrderModal('${currentEditId}', ${idx})" style="background:#f59e0b; color:white; border:none; border-radius:5px; padding:6px; margin-top:10px; cursor:pointer; font-size:0.8rem">Edytuj zamówienie</button>`;
             container.appendChild(group);
         });
     } else {
@@ -232,7 +237,7 @@ const renderSellerView = (type) => {
                 return '';
             }).join('');
             const group = document.createElement('div'); group.className = 'res-group';
-            group.innerHTML = `<div class="res-group-title">📦 ${product.name}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">Sprzedano łącznie: ${tSold} ${product.unit} / ${product.totalQty}</div>${bRows || 'Brak zamówień'}<div class="res-total">Wartość sprzedaży: ${pGrand.toFixed(2)} zł</div>`;
+            group.innerHTML = `<div class="res-group-title">📦 ${product.name}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">Sprzedano: ${tSold} / ${product.totalQty}</div>${bRows || 'Brak'}<div class="res-total">Łącznie: ${pGrand.toFixed(2)} zł</div>`;
             container.appendChild(group);
         });
     }
