@@ -23,7 +23,9 @@ let cachedListingData = null;
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-item-form glass-card-dark';
-    const defaultStep = data.unit === 'g' ? 100 : (data.step || 1);
+    
+    // Ustawienie domyślnego kroku (jeśli brak danych, domyślnie 1 dla szt, 0.25 dla reszty)
+    const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
 
     div.innerHTML = `
         <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
@@ -38,22 +40,32 @@ const createProductFields = (data = {}) => {
             </div>
         </div>
         <div class="row">
-            <div class="input-group"><label>Dostępna ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
-            <div class="input-group"><label>Krok/Podział (np. 0.5)</label><input type="number" class="p-step" step="0.01" value="${defaultStep}" required></div>
+            <div class="input-group"><label>Dostępna ilość (łącznie)</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+            <div class="input-group">
+                <label>Krok/Podział (0.25 do 1.0)</label>
+                <input type="number" class="p-step" min="0.25" max="1" step="0.25" value="${initialStep}" required>
+            </div>
         </div>
-        <div class="input-group" style="flex-direction:row; align-items:center; gap:10px">
-            <input type="checkbox" class="p-no-img" ${data.noImg?'checked':''}> <label style="margin:0">Brak zdjęcia</label>
+        <div class="photo-section">
+            <input type="checkbox" class="p-no-img" id="noImg-${Math.random()}" ${data.noImg?'checked':''}> 
+            <label for="noImg-${Math.random()}">Brak zdjęcia</label>
             <input type="file" class="p-file" style="${data.noImg?'display:none':''}">
         </div>
     `;
 
     const unitSelect = div.querySelector('.p-unit');
     const stepInput = div.querySelector('.p-step');
+    const fileInput = div.querySelector('.p-file');
+    const noImgCheck = div.querySelector('.p-no-img');
+
     unitSelect.onchange = (e) => {
-        if (e.target.value === 'g') stepInput.value = 100;
-        else if (e.target.value === 'szt') stepInput.value = 1;
+        stepInput.value = (e.target.value === 'szt') ? 1 : 0.25;
     };
-    div.querySelector('.p-no-img').onchange = (e) => div.querySelector('.p-file').style.display = e.target.checked ? 'none' : 'block';
+
+    noImgCheck.onchange = (e) => {
+        fileInput.style.display = e.target.checked ? 'none' : 'block';
+    };
+
     return div;
 };
 
@@ -106,7 +118,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         const d = docSnap.data(); const id = docSnap.id;
         const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
-            <div class="listing-header"><h3>Odbiór u: ${d.sellerName}</h3><p>📍 ${d.address} | ⏰ ${d.pickupTimes}</p></div>
+            <div class="listing-header"><h3>Sprzedawca: ${d.sellerName}</h3><p>📍 ${d.address} | ⏰ ${d.pickupTimes}</p></div>
             ${d.items.map(it => `<div class="product-item-list">${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} <div><b>${it.name}</b><br><small>${it.price} zł / ${it.unit} (skok: ${it.step})</small></div></div>`).join('')}
             <div style="padding:20px; display:flex; gap:10px">
                 <button class="btn-primary" onclick="openOrderModal('${id}')">🛒 Zamów</button>
@@ -146,7 +158,6 @@ window.updateSum = () => {
         const price = parseFloat(input.dataset.price);
         total += qty * price;
     });
-    // Zaokrąglenie do 2 miejsc, by uniknąć błędów JS (np. 0.0000000004)
     document.getElementById('modal-total-price').innerText = (Math.round(total * 100) / 100).toFixed(2);
 };
 
