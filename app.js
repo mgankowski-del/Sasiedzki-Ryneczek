@@ -59,6 +59,7 @@ const createProductFields = (data = {}) => {
 
 document.getElementById('open-add-listing-btn').onclick = () => {
     isEditing = false; document.getElementById('modal-title').innerText = "Nowa oferta";
+    document.getElementById('listing-form').reset();
     document.getElementById('products-to-add').innerHTML = '';
     document.getElementById('products-to-add').appendChild(createProductFields());
     document.getElementById('add-listing-modal').classList.remove('hidden');
@@ -119,7 +120,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
 window.openOrderModal = async (id, editIdx = null) => {
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data();
-    cachedListingData = d; // Dla funkcji wyszukiwania
+    cachedListingData = d;
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
     
     d.items.forEach((it) => {
@@ -128,17 +129,27 @@ window.openOrderModal = async (id, editIdx = null) => {
         container.appendChild(row);
     });
 
-    document.getElementById('buyerName').value = '';
-    document.getElementById('buyerPin').value = '';
-    document.getElementById('buyerPickupTime').value = '';
-    document.getElementById('buyer-status-msg').innerText = "💡 Podaj imię i PIN, by złożyć zamówienie.";
-    document.getElementById('buyer-status-msg').className = "info-text";
+    // PAMIĘĆ URZĄDZENIA (LocalStorage)
+    const savedName = localStorage.getItem('ryneczek_name');
+    const savedPin = localStorage.getItem('ryneczek_pin');
+
+    if (savedName && savedPin && editIdx === null) {
+        document.getElementById('buyerName').value = savedName;
+        document.getElementById('buyerPin').value = savedPin;
+        // Automatyczne sprawdzenie zamówienia
+        lookUpOrder();
+    } else {
+        document.getElementById('buyerName').value = '';
+        document.getElementById('buyerPin').value = '';
+        document.getElementById('buyerPickupTime').value = '';
+        document.getElementById('buyer-status-msg').innerText = "💡 Podaj imię i PIN, by złożyć zamówienie.";
+        document.getElementById('buyer-status-msg').className = "info-text";
+    }
 
     document.getElementById('reservation-modal').classList.remove('hidden');
     updateSum();
 };
 
-// FUNKCJA ODSZUKIWANIA ZAMÓWIENIA NA ŻYWO
 const lookUpOrder = () => {
     const name = document.getElementById('buyerName').value.trim().toLowerCase();
     const pin = document.getElementById('buyerPin').value.trim();
@@ -146,20 +157,17 @@ const lookUpOrder = () => {
 
     if (name.length > 2 && pin.length === 4) {
         const existing = cachedListingData.reservations.find(r => r.buyerName.toLowerCase() === name && r.buyerPin === pin);
-        
         if (existing) {
-            msg.innerText = "✅ Witaj ponownie! Załadowaliśmy Twoje zamówienie. Możesz je teraz zmienić.";
+            msg.innerText = `✅ Cześć ${existing.buyerName}! Rozpoznaliśmy Cię. Twoje zamówienie jest poniżej.`;
             msg.className = "info-text info-found";
             document.getElementById('buyerPickupTime').value = existing.time;
-            
-            // Uzupełnij ilości
             document.querySelectorAll('.order-qty').forEach(input => {
                 const foundItem = existing.items.find(i => i.name === input.dataset.name);
                 input.value = foundItem ? foundItem.qty : 0;
             });
             updateSum();
         } else {
-            msg.innerText = "💡 Składasz nowe zamówienie. Zapamiętaj ten PIN do późniejszych zmian!";
+            msg.innerText = "💡 Składasz nowe zamówienie. Zapamiętamy Twoje dane na tym urządzeniu.";
             msg.className = "info-text";
         }
     }
@@ -183,18 +191,19 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         if(q > 0) items.push({ name: input.dataset.name, qty: q });
     });
 
-    if(!buyerName || buyerPin.length !== 4 || items.length === 0) return alert("Wypełnij imię, 4-cyfrowy PIN i wybierz produkty!");
+    if(!buyerName || buyerPin.length !== 4 || items.length === 0) return alert("Wypełnij dane!");
+
+    // ZAPISZ W PAMIĘCI URZĄDZENIA
+    localStorage.setItem('ryneczek_name', buyerName);
+    localStorage.setItem('ryneczek_pin', buyerPin);
 
     const refListing = doc(db, "listings", currentEditId); 
     const snap = await getDoc(refListing);
     let res = snap.data().reservations;
-
     const existingIndex = res.findIndex(r => r.buyerName.toLowerCase() === buyerName.toLowerCase());
     
     if (existingIndex !== -1) {
-        if (res[existingIndex].buyerPin !== buyerPin) {
-            return alert("Błędny PIN dla tego imienia!");
-        }
+        if (res[existingIndex].buyerPin !== buyerPin) return alert("Błędny PIN!");
         res[existingIndex] = { buyerName, buyerPin, time, items };
     } else {
         res.push({ buyerName, buyerPin, time, items });
@@ -225,7 +234,7 @@ const renderSellerView = (type) => {
                 return `<div class="res-sub-item"><span>${i.name} (${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
             }).join('');
             const group = document.createElement('div'); group.className = 'res-group';
-            group.innerHTML = `<div class="res-group-title">👤 ${r.buyerName}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">⏰ ${r.time}</div>${itemsRows}<div class="res-total">Suma: ${pTotal.toFixed(2)} zł</div><button onclick="openOrderModal('${currentEditId}', ${idx})" style="background:#f59e0b; color:white; border:none; border-radius:5px; padding:6px; margin-top:10px; cursor:pointer; font-size:0.8rem">Edytuj zamówienie</button>`;
+            group.innerHTML = `<div class="res-group-title">👤 ${r.buyerName}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">⏰ ${r.time}</div>${itemsRows}<div class="res-total">Do zapłaty: ${pTotal.toFixed(2)} zł</div><button onclick="openOrderModal('${currentEditId}', ${idx})" style="background:#f59e0b; color:white; border:none; border-radius:5px; padding:6px; margin-top:10px; cursor:pointer; font-size:0.8rem">Edytuj zamówienie</button>`;
             container.appendChild(group);
         });
     } else {
