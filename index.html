@@ -7,46 +7,96 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>Sąsiedzki Ryneczek</h1>
-        <p>Domowe produkty od Twoich sąsiadów</p>
-    </header>
+    <div class="container">
+        <header>
+            <h1>Sąsiedzki Ryneczek</h1>
+            <p class="subtitle">Domowe produkty od Twoich sąsiadów</p>
+        </header>
 
-    <main>
-        <section id="add-listing">
-            <h2>Dodaj nowe ogłoszenie</h2>
-            <form id="listing-form">
-                <input type="text" id="title" placeholder="Co oferujesz? (np. Chleb Rysia)" required>
-                
-                <div class="input-group">
-                    <input type="number" id="price" placeholder="Cena" step="0.01" required>
-                    <input type="text" id="unit" placeholder="Jednostka (np. szt., kg)" required>
+        <main>
+            <section id="add-listing" class="glass-card">
+                <h2>Dodaj nowe ogłoszenie</h2>
+                <form id="listing-form">
+                    <div class="input-group">
+                        <label>Co oferujesz?</label>
+                        <input type="text" id="title" placeholder="np. Chleb Rysia" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="input-group">
+                            <label>Cena (zł)</label>
+                            <input type="number" id="price" step="0.01" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Jednostka</label>
+                            <input type="text" id="unit" placeholder="szt, kg, słoik" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Kiedy sąsiad może odebrać produkt?</label>
+                        <input type="text" id="pickupTimes" placeholder="np. Poniedziałek 17-20, Sobota rano" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Opis i składniki</label>
+                        <textarea id="description" placeholder="Opisz swój produkt..." required></textarea>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="file-label">
+                            <span>📷 Dodaj zdjęcie (JPG, PNG, WebP)</span>
+                            <input type="file" id="productImage" accept="image/*, .jpg, .jpeg, .png, .webp" required>
+                        </label>
+                    </div>
+
+                    <div class="row">
+                        <div class="input-group">
+                            <label>Twoje Imię</label>
+                            <input type="text" id="sellerName" placeholder="Kasia z 4 piętra" required>
+                        </div>
+                        <div class="input-group">
+                            <label>PIN (do usuwania)</label>
+                            <input type="password" id="pin" maxlength="4" placeholder="4 cyfry" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submitBtn">Opublikuj ogłoszenie</button>
+                </form>
+            </section>
+
+            <section id="listings">
+                <h2>Aktualne ogłoszenia</h2>
+                <div id="listings-container">
+                    <p class="loading">Ładowanie ogłoszeń...</p>
                 </div>
+            </section>
+        </main>
+    </div>
 
-                <textarea id="description" placeholder="Opisz swój produkt..." required></textarea>
-
-                <div class="file-upload">
-                    <label for="productImage">Dodaj zdjęcie produktu:</label>
-                    <input type="file" id="productImage" accept="image/*, .jpg, .jpeg, .png, .webp" required>
-                </div>
-
-                <button type="submit" id="submitBtn">Opublikuj ogłoszenie</button>
-            </form>
-        </section>
-
-        <hr>
-
-        <section id="listings">
-            <h2>Aktualne ogłoszenia</h2>
-            <div id="listings-container">
-                <p class="loading">Ładowanie ogłoszeń...</p>
+    <div id="reservation-modal" class="modal hidden">
+        <div class="modal-content glass-card">
+            <h3>Zarezerwuj produkt</h3>
+            <p id="modal-product-info"></p>
+            <div class="input-group">
+                <label>O której godzinie przyjdziesz?</label>
+                <input type="datetime-local" id="buyerPickupTime" required>
             </div>
-        </section>
-    </main>
+            <div class="modal-buttons">
+                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam rezerwację</button>
+                <button id="close-modal-btn" class="btn-secondary">Anuluj</button>
+            </div>
+        </div>
+    </div>
 
-    <footer>
-        <p>&copy; 2026 Sąsiedzki Ryneczek - Twoja lokalna społeczność</p>
-    </footer>
+    <div id="success-modal" class="modal hidden">
+        <div class="modal-content glass-card success-view">
+            <h2>🎉 Gotowe!</h2>
+            <p>Twoja rezerwacja została zapisana.</p>
+            <button id="add-to-calendar-btn" class="btn-calendar">📅 Dodaj do Kalendarza Google</button>
+            <button onclick="location.reload()" class="btn-secondary">Zamknij</button>
+        </div>
+    </div>
 
     <script type="module" src="app.js"></script>
 </body>
