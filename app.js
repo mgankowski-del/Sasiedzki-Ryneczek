@@ -23,6 +23,10 @@ let cachedListingData = null;
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-item-form glass-card-dark';
+    
+    // Logika domyślnego kroku dla g/kg
+    const defaultStep = data.unit === 'g' ? 100 : (data.step || 1);
+
     div.innerHTML = `
         <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
         <div class="row">
@@ -31,18 +35,28 @@ const createProductFields = (data = {}) => {
                 <select class="p-unit">
                     <option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option>
                     <option value="kg" ${data.unit==='kg'?'selected':''}>kg</option>
-                    <option value="g" ${data.unit==='g'?'selected':''}>g (co 100g)</option>
+                    <option value="g" ${data.unit==='g'?'selected':''}>g</option>
                 </select>
             </div>
         </div>
         <div class="row">
-            <div class="input-group"><label>Ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
-            <div class="input-group" style="flex-direction:row; align-items:center; gap:10px; margin-top:20px">
-                <input type="checkbox" class="p-no-img" ${data.noImg?'checked':''}> <label style="margin:0">Brak zdjęcia</label>
-            </div>
+            <div class="input-group"><label>Dostępna ilość (łącznie)</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+            <div class="input-group"><label>Krok zamówienia (np. 0.25)</label><input type="number" class="p-step" step="0.01" value="${defaultStep}" required></div>
         </div>
-        <input type="file" class="p-file" style="${data.noImg?'display:none':''}">
+        <div class="input-group" style="flex-direction:row; align-items:center; gap:10px">
+            <input type="checkbox" class="p-no-img" ${data.noImg?'checked':''}> <label style="margin:0">Brak zdjęcia</label>
+            <input type="file" class="p-file" style="${data.noImg?'display:none':''}">
+        </div>
     `;
+
+    const unitSelect = div.querySelector('.p-unit');
+    const stepInput = div.querySelector('.p-step');
+    
+    unitSelect.onchange = (e) => {
+        if (e.target.value === 'g') stepInput.value = 100;
+        else if (e.target.value === 'szt') stepInput.value = 1;
+    };
+
     div.querySelector('.p-no-img').onchange = (e) => div.querySelector('.p-file').style.display = e.target.checked ? 'none' : 'block';
     return div;
 };
@@ -74,7 +88,8 @@ document.getElementById('listing-form').onsubmit = async (e) => {
             price: parseFloat(div.querySelector('.p-price').value),
             unit: div.querySelector('.p-unit').value,
             totalQty: parseFloat(div.querySelector('.p-total').value),
-            noImg, imageUrl: url, step: div.querySelector('.p-unit').value === 'g' ? 100 : 1
+            step: parseFloat(div.querySelector('.p-step').value),
+            noImg, imageUrl: url
         });
     }
     const data = {
@@ -95,8 +110,8 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         const d = docSnap.data(); const id = docSnap.id;
         const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
-            <div class="listing-header"><h3>Odbiór u: ${d.sellerName}</h3><p>📍 ${d.address} | ⏰ ${d.pickupTimes}</p></div>
-            ${d.items.map(it => `<div class="product-item-list">${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} <div><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small></div></div>`).join('')}
+            <div class="listing-header"><h3>Sprzedawca: ${d.sellerName}</h3><p>📍 ${d.address} | ⏰ ${d.pickupTimes}</p></div>
+            ${d.items.map(it => `<div class="product-item-list">${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} <div><b>${it.name}</b><br><small>${it.price} zł / ${it.unit} (skok: ${it.step})</small></div></div>`).join('')}
             <div style="padding:20px; display:flex; gap:10px">
                 <button class="btn-primary" onclick="openOrderModal('${id}')">🛒 Zamów</button>
                 <button class="btn-secondary" onclick="authSeller('${id}', '${d.pin}')">⚙️ Panel</button>
@@ -110,28 +125,39 @@ window.openOrderModal = async (id, editIdx = null) => {
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data();
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
-    document.getElementById('res-modal-title').innerText = editIdx !== null ? "Zmień zamówienie" : "Złóż zamówienie";
+    
     if(editIdx !== null) {
         document.getElementById('buyerName').value = d.reservations[editIdx].buyerName;
         document.getElementById('buyerPickupTime').value = d.reservations[editIdx].time;
     }
+
     d.items.forEach((it) => {
         const row = document.createElement('div'); row.className = 'product-item-list';
-        row.innerHTML = `<span>${it.name}</span><div class="qty-control"><button class="qty-btn" onclick="this.nextElementSibling.stepDown(); updateSum()">-</button><input type="number" class="order-qty" data-price="${it.price}" step="${it.step}" value="0" min="0" onchange="updateSum()"><button class="qty-btn" onclick="this.previousElementSibling.stepUp(); updateSum()">+</button></div>`;
+        const startVal = (editIdx !== null) ? (d.reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
+        
+        row.innerHTML = `
+            <span>${it.name}</span>
+            <div class="qty-control">
+                <button class="qty-btn" onclick="this.nextElementSibling.stepDown(); updateSum()">-</button>
+                <input type="number" class="order-qty" data-price="${it.price}" step="${it.step}" value="${startVal}" min="0" onchange="updateSum()">
+                <button class="qty-btn" onclick="this.previousElementSibling.stepUp(); updateSum()">+</button>
+            </div>
+        `;
         container.appendChild(row);
     });
     document.getElementById('reservation-modal').classList.remove('hidden');
+    updateSum();
 };
 
 window.updateSum = () => {
-    let total = 0; document.querySelectorAll('.order-qty').forEach(i => total += i.value * i.dataset.price);
+    let total = 0; document.querySelectorAll('.order-qty').forEach(i => total += parseFloat(i.value || 0) * parseFloat(i.dataset.price));
     document.getElementById('modal-total-price').innerText = total.toFixed(2);
 };
 
 document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerName = document.getElementById('buyerName').value; const time = document.getElementById('buyerPickupTime').value;
     const items = []; document.querySelectorAll('.order-qty').forEach((input, idx) => {
-        if(input.value > 0) items.push({ name: document.querySelectorAll('.product-item-list span')[idx].innerText, qty: input.value });
+        if(parseFloat(input.value) > 0) items.push({ name: document.querySelectorAll('.product-item-list span')[idx].innerText, qty: parseFloat(input.value) });
     });
     const refListing = doc(db, "listings", currentEditId); const snap = await getDoc(refListing);
     let res = snap.data().reservations;
@@ -151,54 +177,32 @@ window.authSeller = async (id, pin) => {
 
 const renderSellerView = (type) => {
     const container = document.getElementById('reservations-container');
-    container.innerHTML = '';
-    const d = cachedListingData;
-
+    container.innerHTML = ''; const d = cachedListingData;
     document.getElementById('view-by-person').classList.toggle('active', type === 'person');
     document.getElementById('view-by-product').classList.toggle('active', type === 'product');
 
     if (type === 'person') {
         d.reservations.forEach((r, idx) => {
-            let personTotal = 0;
+            let pTotal = 0;
             const itemsRows = r.items.map(i => {
-                const product = d.items.find(pi => pi.name === i.name);
-                const subTotal = product ? i.qty * product.price : 0;
-                personTotal += subTotal;
-                return `<div class="res-sub-item"><span>${i.name} (${i.qty})</span> <b>${subTotal.toFixed(2)} zł</b></div>`;
+                const prod = d.items.find(pi => pi.name === i.name);
+                const st = prod ? i.qty * prod.price : 0; pTotal += st;
+                return `<div class="res-sub-item"><span>${i.name} (${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
             }).join('');
-
             const group = document.createElement('div'); group.className = 'res-group';
-            group.innerHTML = `
-                <div class="res-group-title">👤 ${r.buyerName}</div>
-                <div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">⏰ Odbiór: ${r.time}</div>
-                ${itemsRows}
-                <div class="res-total">Do zapłaty: ${personTotal.toFixed(2)} zł</div>
-                <button onclick="openOrderModal('${currentEditId}', ${idx})" style="background:#f59e0b; color:white; border:none; border-radius:5px; padding:6px; margin-top:10px; cursor:pointer; font-size:0.8rem">Edytuj zamówienie</button>
-            `;
+            group.innerHTML = `<div class="res-group-title">👤 ${r.buyerName}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">⏰ ${r.time}</div>${itemsRows}<div class="res-total">Suma: ${pTotal.toFixed(2)} zł</div><button onclick="openOrderModal('${currentEditId}', ${idx})" style="background:#f59e0b; color:white; border:none; border-radius:5px; padding:6px; margin-top:10px; cursor:pointer; font-size:0.8rem">Edytuj</button>`;
             container.appendChild(group);
         });
     } else {
         d.items.forEach(product => {
-            let productGrandTotal = 0;
-            let totalSoldQty = 0;
-            const buyerRows = d.reservations.map(r => {
-                const found = r.items.find(i => i.name === product.name);
-                if (found) {
-                    const cost = found.qty * product.price;
-                    productGrandTotal += cost;
-                    totalSoldQty += parseFloat(found.qty);
-                    return `<div class="res-sub-item"><span>${r.buyerName}</span> <b>${found.qty} ${product.unit}</b></div>`;
-                }
+            let pGrand = 0; let tSold = 0;
+            const bRows = d.reservations.map(r => {
+                const f = r.items.find(i => i.name === product.name);
+                if (f) { pGrand += f.qty * product.price; tSold += f.qty; return `<div class="res-sub-item"><span>${r.buyerName}</span> <b>${f.qty} ${product.unit}</b></div>`; }
                 return '';
             }).join('');
-
             const group = document.createElement('div'); group.className = 'res-group';
-            group.innerHTML = `
-                <div class="res-group-title">📦 ${product.name}</div>
-                <div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">Łącznie sprzedano: ${totalSoldQty} ${product.unit}</div>
-                ${buyerRows || '<div style="opacity:0.5; font-size:0.8rem">Brak zamówień</div>'}
-                <div class="res-total">Suma sprzedaży: ${productGrandTotal.toFixed(2)} zł</div>
-            `;
+            group.innerHTML = `<div class="res-group-title">📦 ${product.name}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">Sprzedano: ${tSold} ${product.unit}</div>${bRows || 'Brak'}<div class="res-total">Razem: ${pGrand.toFixed(2)} zł</div>`;
             container.appendChild(group);
         });
     }

@@ -31,22 +31,16 @@ header { text-align: center; margin-bottom: 40px; }
 
 .res-group { margin-bottom: 15px; border-left: 4px solid var(--accent); padding-left: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 0 15px 15px 0; }
 .res-group-title { font-weight: bold; color: var(--accent); font-size: 1.1rem; margin-bottom: 8px; }
-.res-sub-item { font-size: 0.95rem; margin-bottom: 4px; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 2px; }
+.res-sub-item { font-size: 0.95rem; margin-bottom: 4px; display: flex; justify-content: space-between; padding-bottom: 2px; }
 
-/* STYL DLA KWOTY ŁĄCZNEJ */
 .res-total {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--accent);
-    color: #fbbf24;
-    font-weight: 800;
-    font-size: 1.1rem;
-    text-align: right;
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--accent);
+    color: #fbbf24; font-weight: 800; font-size: 1.1rem; text-align: right;
 }
 
 .input-group { margin-bottom: 15px; display: flex; flex-direction: column; text-align: left; }
 .input-group label { font-size: 0.85rem; margin-bottom: 5px; color: #94a3b8; }
-input, select { padding: 12px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: white; }
+input, select { padding: 12px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: white; width: 100%; box-sizing: border-box; }
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 
@@ -57,10 +51,15 @@ input, select { padding: 12px; border-radius: 10px; border: 1px solid #334155; b
 
 .modal-buttons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
 .btn-primary { background: var(--primary); color: white; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; }
-.btn-edit { background: #f59e0b; color: white; border-radius: 12px; padding: 12px; border: none; font-weight: bold; }
-.btn-delete { background: #ef4444; color: white; border-radius: 12px; padding: 12px; border: none; font-weight: bold; }
+.btn-edit { background: #f59e0b; color: white; border-radius: 12px; padding: 12px; border: none; font-weight: bold; cursor: pointer; }
+.btn-delete { background: #ef4444; color: white; border-radius: 12px; padding: 12px; border: none; font-weight: bold; cursor: pointer; }
 .btn-cancel { background: transparent; color: #94a3b8; width: 100%; margin-top: 10px; border: none; cursor: pointer; font-weight: bold; }
 
 .qty-control { display: flex; align-items: center; gap: 10px; }
-.qty-btn { background: var(--primary); color: white; width: 30px; height: 30px; border-radius: 50%; border: none; }
+.qty-btn { background: var(--primary); color: white; width: 35px; height: 35px; border-radius: 50%; border: none; cursor: pointer; font-weight: bold; }
+.qty-btn:active { transform: scale(0.9); }
+.order-qty { width: 80px !important; text-align: center; }
+
 .total-summary { font-size: 1.4rem; font-weight: bold; text-align: center; margin: 20px 0; color: #818cf8; }
+
+.glass-card-dark { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px; margin-bottom: 15px; }
