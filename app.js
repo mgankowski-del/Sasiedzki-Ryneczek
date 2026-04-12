@@ -15,7 +15,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// POMOCNICZA: Obliczanie dostępności
 const calculateRemaining = (productName, totalQty, reservations) => {
     let reserved = 0;
     reservations.forEach(res => {
@@ -25,7 +24,6 @@ const calculateRemaining = (productName, totalQty, reservations) => {
     return Math.max(0, totalQty - reserved);
 };
 
-// DODAWANIE PÓL W FORMULARZU
 document.getElementById('add-more-items').onclick = () => {
     const container = document.getElementById('products-to-add');
     const newItem = container.firstElementChild.cloneNode(true);
@@ -33,11 +31,10 @@ document.getElementById('add-more-items').onclick = () => {
     container.appendChild(newItem);
 };
 
-// PUBLIKACJA
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
-    btn.disabled = true; btn.innerText = "Wysyłanie...";
+    btn.disabled = true; btn.innerText = "Publikowanie...";
 
     const productDivs = document.querySelectorAll('.product-item-form');
     const items = Array.from(productDivs).map(div => ({
@@ -65,7 +62,6 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     } catch (err) { alert("Błąd!"); console.error(err); }
 };
 
-// RENDEROWANIE OGŁOSZEŃ
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const list = document.getElementById('listings-container');
     list.innerHTML = '';
@@ -76,10 +72,10 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         const itemsHtml = d.items.map(it => {
             const rem = calculateRemaining(it.name, it.totalQty, d.reservations);
             return `
-                <div class="item-row">
+                <div class="item-status-row">
                     <div>
                         <b>${it.name}</b><br>
-                        <span class="remaining">${rem > 0 ? `Zostało: ${rem} ${it.unit}` : '<span class="sold-out">Niestety, wszystko się rozeszło!</span>'}</span>
+                        <small style="color:#64748b">${rem > 0 ? `Dostępne: ${rem} ${it.unit}` : '<span class="sold-out-text">Wszystko sprzedane</span>'}</small>
                     </div>
                     <span>${it.price} zł / ${it.unit}</span>
                 </div>
@@ -92,19 +88,16 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
             <img src="${d.imageUrl}" class="product-image">
             <div class="product-info">
                 <h3 style="margin:0 0 10px 0">${d.title}</h3>
-                <div class="pickup-tag" style="background:#f1f5f9; padding:8px; border-radius:8px; font-size:0.8rem; margin-bottom:15px">
-                    👤 ${d.sellerName} | ⏰ ${d.pickupTimes}
-                </div>
+                <div style="font-size:0.85rem; color:#64748b; margin-bottom:15px">🏠 ${d.sellerName} | ⏰ ${d.pickupTimes}</div>
                 <div>${itemsHtml}</div>
-                <button class="btn-primary" onclick="openOrderModal('${id}')" style="margin-top:15px">Zarezerwuj produkty</button>
-                <button class="btn-secondary" onclick="authSeller('${id}', '${d.pin}')" style="width:100%; margin-top:8px">⚙️ Zarządzaj ogłoszeniem</button>
+                <button class="btn-primary" onclick="openOrderModal('${id}')" style="margin-top:15px">Zarezerwuj teraz</button>
+                <button class="btn-secondary" onclick="authSeller('${id}', '${d.pin}')" style="width:100%; margin-top:10px; color:#475569">⚙️ Zarządzaj ogłoszeniem</button>
             </div>
         `;
         list.appendChild(card);
     });
 });
 
-// LOGIKA ZAMÓWIENIA
 let currentListingId = null;
 let orderState = {};
 
@@ -121,9 +114,12 @@ window.openOrderModal = (id) => {
             orderState[index] = { qty: 0, price: it.price, step: it.step, name: it.name, unit: it.unit, max: rem };
             
             const row = document.createElement('div');
-            row.className = 'item-row';
+            row.className = 'qty-row';
             row.innerHTML = `
-                <span>${it.name} ${rem <= 0 ? '<br><small class="sold-out">Wyprzedane</small>' : ''}</span>
+                <div class="qty-info">
+                    <b>${it.name}</b>
+                    <span class="qty-available">Pozostało: ${rem} ${it.unit}</span>
+                </div>
                 <div class="qty-control">
                     <button class="qty-btn" onclick="updateQty(${index}, -1)" ${rem <= 0 ? 'disabled' : ''}>-</button>
                     <span class="qty-val" id="modal-qty-${index}">0 ${it.unit}</span>
@@ -139,13 +135,9 @@ window.openOrderModal = (id) => {
 window.updateQty = (index, dir) => {
     const s = orderState[index];
     const newVal = Math.max(0, s.qty + (dir * s.step));
-    
     if (newVal > s.max) return alert("Brak większej ilości!");
-    
     s.qty = newVal;
     document.getElementById(`modal-qty-${index}`).innerText = `${newVal.toFixed(2)} ${s.unit}`;
-    
-    // Blokuj przycisk [+] jeśli osiągnięto max
     document.getElementById(`plus-${index}`).disabled = (newVal + s.step > s.max);
 
     let total = 0;
@@ -157,7 +149,6 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerName = document.getElementById('buyerName').value;
     const time = document.getElementById('buyerPickupTime').value;
     const ordered = Object.values(orderState).filter(o => o.qty > 0);
-    
     if(!buyerName || ordered.length === 0) return alert("Podaj imię i wybierz produkty!");
 
     await updateDoc(doc(db, "listings", currentListingId), {
@@ -166,20 +157,20 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     location.reload();
 };
 
-// PANEL SPRZEDAWCY
 window.authSeller = (id, pin) => {
-    if(prompt("Podaj PIN ogłoszenia:") !== pin) return alert("Błędny PIN");
+    if(prompt("Podaj PIN:") !== pin) return alert("Błędny PIN");
     currentListingId = id;
     onSnapshot(doc(db, "listings", id), (snap) => {
         const d = snap.data();
         const resCont = document.getElementById('reservations-container');
-        resCont.innerHTML = `<h4>Rezerwacje dla: ${d.title}</h4>`;
+        resCont.innerHTML = `<h4 style="color:#818cf8; margin-bottom:15px">Zamówienia:</h4>`;
         d.reservations.forEach(r => {
             const listStr = r.items.map(i => `${i.qty}x ${i.name}`).join(', ');
             resCont.innerHTML += `
-                <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; margin-bottom:10px; border-left:4px solid #4f46e5">
-                    <b>${r.buyerName}</b>: ${listStr}<br>
-                    <small>🕒 Odbiór: ${r.time}</small>
+                <div style="background:#0f172a; padding:12px; border-radius:12px; margin-bottom:10px; border-left:4px solid var(--primary)">
+                    <b style="color:#cbd5e1">${r.buyerName}</b><br>
+                    <span style="font-size:0.9rem">${listStr}</span><br>
+                    <small style="color:#64748b">🕒 ${r.time}</small>
                 </div>`;
         });
         document.getElementById('seller-modal').classList.remove('hidden');
@@ -187,7 +178,7 @@ window.authSeller = (id, pin) => {
 };
 
 document.getElementById('delete-listing-btn').onclick = async () => {
-    if(confirm("Czy usunąć ofertę z Ryneczku?")) {
+    if(confirm("Usunąć ogłoszenie?")) {
         await deleteDoc(doc(db, "listings", currentListingId));
         location.reload();
     }

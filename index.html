@@ -88,12 +88,12 @@
     </div>
 
     <div id="reservation-modal" class="modal hidden">
-        <div class="modal-content glass-card">
+        <div class="modal-content modal-solid">
             <h3>Co zamawiasz?</h3>
             <div id="modal-order-items"></div>
             
             <div class="total-summary">
-                Do zapłaty: <span id="modal-total-price">0.00</span> zł
+                Suma do zapłaty: <span id="modal-total-price">0.00</span> zł
             </div>
 
             <div class="input-group">
@@ -101,23 +101,23 @@
                 <input type="text" id="buyerName" placeholder="Jak sąsiad ma Cię podpisać?" required>
             </div>
             <div class="input-group">
-                <label>Daj znać, kiedy wpadniesz:</label>
+                <label>Kiedy wpadniesz?</label>
                 <input type="text" id="buyerPickupTime" placeholder="np. Wstąpię jutro około 10" required>
             </div>
             
             <div class="modal-buttons">
                 <button id="confirm-booking-btn" class="btn-primary">Potwierdzam zamówienie</button>
-                <button onclick="closeModals()" class="btn-secondary">Anuluj</button>
+                <button onclick="closeModals()" class="btn-cancel">Anuluj</button>
             </div>
         </div>
     </div>
 
     <div id="seller-modal" class="modal hidden">
-        <div class="modal-content glass-card seller-view">
+        <div class="modal-content modal-solid seller-view">
             <h3>Lista zamówień</h3>
             <div id="reservations-container" class="reservations-panel"></div>
             <button id="delete-listing-btn" class="btn-delete">Zdejmij ogłoszenie z tablicy</button>
-            <button onclick="closeModals()" class="btn-secondary">Zamknij</button>
+            <button onclick="closeModals()" class="btn-cancel">Zamknij</button>
         </div>
     </div>
 
