@@ -31,7 +31,7 @@ header { text-align: center; margin-bottom: 40px; }
 
 .res-group { margin-bottom: 15px; border-left: 4px solid var(--accent); padding-left: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 0 15px 15px 0; }
 .res-group-title { font-weight: bold; color: var(--accent); font-size: 1.1rem; margin-bottom: 8px; }
-.res-sub-item { font-size: 0.95rem; margin-bottom: 4px; display: flex; justify-content: space-between; padding-bottom: 2px; }
+.res-sub-item { font-size: 0.95rem; margin-bottom: 4px; display: flex; justify-content: space-between; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.05); }
 
 .res-total {
     margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--accent);
@@ -57,8 +57,7 @@ input, select { padding: 12px; border-radius: 10px; border: 1px solid #334155; b
 
 .qty-control { display: flex; align-items: center; gap: 10px; }
 .qty-btn { background: var(--primary); color: white; width: 35px; height: 35px; border-radius: 50%; border: none; cursor: pointer; font-weight: bold; }
-.qty-btn:active { transform: scale(0.9); }
-.order-qty { width: 80px !important; text-align: center; }
+.order-qty { width: 80px !important; text-align: center; border: none !important; font-weight: bold; }
 
 .total-summary { font-size: 1.4rem; font-weight: bold; text-align: center; margin: 20px 0; color: #818cf8; }
 
