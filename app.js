@@ -118,7 +118,7 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerTime = document.getElementById('buyerPickupTime').value;
     if (!buyerName || !buyerTime) return alert("Wpisz swoje imię i kiedy wpadniesz!");
     
-    lastPickupText = buyerTime; // Zapamiętujemy tekst dla kalendarza
+    lastPickupText = buyerTime;
 
     try {
         await updateDoc(doc(db, "listings", currentProductId), {
@@ -137,14 +137,13 @@ document.getElementById('delete-listing-btn').onclick = async () => {
     }
 };
 
-// KALENDARZ GOOGLE (Z TEKSTEM OPISOWYM)
+// KALENDARZ GOOGLE
 document.getElementById('add-to-calendar-btn').onclick = () => {
     const now = new Date();
     const start = now.toISOString().replace(/-|:|\.\d\d\d/g, "");
     const end = new Date(now.getTime() + 3600000).toISOString().replace(/-|:|\.\d\d\d/g, "");
     
-    // Dodajemy opisowy czas do szczegółów wydarzenia
-    const details = `Odbiór od: ${currentProductData.seller}. Twój zadeklarowany czas: ${lastPickupText}`;
+    const details = `Odbiór od: ${currentProductData.seller}. Twój opis czasu: ${lastPickupText}`;
     const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Odbiór: ' + currentProductData.title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&sf=true&output=xml`;
     window.open(url, '_blank');
 };
