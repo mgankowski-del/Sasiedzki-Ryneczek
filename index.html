@@ -44,7 +44,6 @@
                 <hr>
                 <div id="products-to-add"></div>
                 <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt</button>
-                
                 <div class="row" style="margin-top: 20px;">
                     <div class="input-group">
                         <label>PIN ogłoszenia (widoczny)</label>
@@ -63,7 +62,6 @@
             <p id="buyer-status-msg" class="info-text">💡 Podaj imię i PIN, by złożyć zamówienie.</p>
             <div id="modal-order-items"></div>
             <div class="total-summary">Razem: <span id="modal-total-price">0.00</span> zł</div>
-            
             <div class="row">
                 <div class="input-group">
                     <label>Twoje imię:</label>
@@ -78,7 +76,6 @@
                 <label>Kiedy odbierzesz?</label>
                 <input type="text" id="buyerPickupTime" placeholder="Np. Dzisiaj wieczorem" required>
             </div>
-            
             <div class="modal-buttons">
                 <button id="confirm-booking-btn" class="btn-primary">Zatwierdź zamówienie</button>
                 <button onclick="closeModals()" class="btn-cancel">Anuluj</button>
@@ -88,17 +85,22 @@
 
     <div id="seller-modal" class="modal hidden">
         <div class="modal-content modal-solid scrollable-modal">
-            <h3>Panel Zarządzania</h3>
-            <div class="view-switcher">
-                <button id="view-by-person" class="btn-tab active">👤 Wg osób</button>
-                <button id="view-by-product" class="btn-tab">📦 Wg produktów</button>
+            <div class="modal-header">
+                <h3>Panel Zarządzania</h3>
+                <div class="view-switcher">
+                    <button id="view-by-person" class="tab-btn active">👤 Wg osób</button>
+                    <button id="view-by-product" class="tab-btn">📦 Wg produktów</button>
+                </div>
             </div>
-            <div id="reservations-container" class="reservations-panel"></div>
-            <div class="modal-buttons-grid">
-                <button id="edit-listing-btn" class="btn-edit">✏️ Modyfikuj ofertę</button>
-                <button id="delete-listing-btn" class="btn-delete">🗑️ Usuń ofertę</button>
+
+            <div id="reservations-container" class="reservations-list-container">
+                </div>
+
+            <div class="admin-actions">
+                <button id="edit-listing-btn" class="btn-edit-main">✏️ Modyfikuj ogłoszenie</button>
+                <button id="delete-listing-btn" class="btn-delete-main">🗑️ Usuń całą ofertę</button>
+                <button onclick="closeModals()" class="btn-close-outline">Zamknij panel</button>
             </div>
-            <button onclick="closeModals()" class="btn-cancel">Zamknij</button>
         </div>
     </div>
 
