@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sąsiedzki Ryneczek</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -19,7 +19,7 @@
         <main>
             <section id="listings">
                 <div id="listings-container">
-                    <p class="loading">Szukamy produktów...</p>
+                    <p class="loading-state">Szukamy produktów w Twojej okolicy...</p>
                 </div>
             </section>
         </main>
@@ -27,7 +27,7 @@
 
     <div id="add-listing-modal" class="modal hidden">
         <div class="modal-content modal-solid scrollable-modal">
-            <h2>Nowa oferta</h2>
+            <h2 id="modal-title">Nowa oferta</h2>
             <form id="listing-form">
                 <div class="form-grid">
                     <div class="input-group">
@@ -41,7 +41,7 @@
                 </div>
                 <div class="input-group">
                     <label>Możliwe godziny odbioru</label>
-                    <input type="text" id="pickupTimes" placeholder="Np. Pon-Pt 17-20, Soboty rano" required>
+                    <input type="text" id="pickupTimes" placeholder="Np. Pon-Pt 17-20" required>
                 </div>
                 <hr class="divider">
                 
@@ -49,8 +49,8 @@
                 
                 <button type="button" id="add-more-items" class="btn-secondary-outline">+ Dodaj kolejny produkt</button>
                 
-                <div class="input-group pin-group">
-                    <label>PIN ogłoszenia (do edycji)</label>
+                <div class="input-group" style="margin-top: 20px;">
+                    <label>PIN ogłoszenia (widoczny)</label>
                     <input type="text" id="pin" maxlength="4" placeholder="4 cyfry" required>
                 </div>
                 
@@ -71,7 +71,7 @@
             
             <div class="total-bar">
                 <span>Razem:</span>
-                <span><span id="modal-total-price">0.00</span> zł</span>
+                <span id="modal-total-price">0.00</span> zł
             </div>
             
             <div class="form-grid">
@@ -80,25 +80,25 @@
                     <input type="text" id="buyerName" placeholder="Imię" required>
                 </div>
                 <div class="input-group">
-                    <label>PIN (4 cyfry):</label>
+                    <label>Twój PIN (4 cyfry):</label>
                     <input type="text" id="buyerPin" maxlength="4" placeholder="Kod" required>
                 </div>
             </div>
             <div class="input-group">
-                <label>Kiedy wpadniesz?</label>
+                <label>Kiedy odbierzesz?</label>
                 <input type="text" id="buyerPickupTime" placeholder="Np. Dzisiaj po 18:00" required>
             </div>
             
             <div class="modal-actions">
                 <button id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
-                <button type="button" onclick="closeModals()" class="btn-cancel-link">Wróć</button>
+                <button type="button" onclick="closeModals()" class="btn-cancel-link">Anuluj</button>
             </div>
         </div>
     </div>
 
     <div id="seller-modal" class="modal hidden">
         <div class="modal-content modal-solid scrollable-modal">
-            <div class="modal-nav">
+            <div class="modal-nav-header">
                 <h3>Zarządzanie</h3>
                 <div class="tabs">
                     <button id="view-by-person" class="tab active">👤 Osoby</button>
@@ -107,7 +107,7 @@
             </div>
             <div id="reservations-container"></div>
             <div class="modal-actions">
-                <button id="edit-listing-btn" class="btn-warning-action">✏️ Edytuj ogłoszenie</button>
+                <button id="edit-listing-btn" class="btn-warning-action">✏️ Modyfikuj ogłoszenie</button>
                 <button id="delete-listing-btn" class="btn-danger-action">🗑️ Usuń całą ofertę</button>
                 <button onclick="closeModals()" class="btn-close-panel">Zamknij</button>
             </div>
