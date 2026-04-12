@@ -17,7 +17,7 @@
         </header>
 
         <main id="listings-container">
-            <p class="status-msg">Ładowanie świeżych ofert...</p>
+            <p class="status-msg">Ładowanie ofert...</p>
         </main>
     </div>
 
@@ -33,10 +33,10 @@
                 <hr class="divider">
                 <div id="products-to-add"></div>
                 <button type="button" id="add-more-items" class="btn-secondary-action">+ Dodaj produkt</button>
-                <div class="input-group" style="margin-top:20px"><label>PIN ogłoszenia (do edycji)</label><input type="text" id="pin" maxlength="4" required></div>
+                <div class="input-group" style="margin-top:20px"><label>PIN (do edycji ogłoszenia)</label><input type="text" id="pin" maxlength="4" required></div>
                 <div class="modal-actions">
                     <button type="submit" id="submitBtn" class="btn-primary-action">Zapisz i Opublikuj</button>
-                    <button type="button" class="btn-cancel-action" onclick="closeModals()">Anuluj</button>
+                    <button type="button" class="btn-cancel-action" id="close-add-modal">Anuluj</button>
                 </div>
             </form>
         </div>
@@ -50,12 +50,12 @@
             <div class="total-bar"><span>Razem:</span><span><span id="modal-total-price">0.00</span> zł</span></div>
             <div class="form-grid">
                 <div class="input-group"><label>Twoje imię</label><input type="text" id="buyerName" required></div>
-                <div class="input-group"><label>Twój PIN (4 cyfry)</label><input type="text" id="buyerPin" maxlength="4" required></div>
+                <div class="input-group"><label>PIN (4 cyfry)</label><input type="text" id="buyerPin" maxlength="4" required></div>
             </div>
             <div class="input-group"><label>Kiedy odbierzesz?</label><input type="text" id="buyerPickupTime" required></div>
             <div class="modal-actions">
                 <button id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
-                <button type="button" class="btn-cancel-action" onclick="closeModals()">Anuluj</button>
+                <button type="button" class="btn-cancel-action" id="close-res-modal">Anuluj</button>
             </div>
         </div>
     </div>
@@ -71,7 +71,7 @@
             <div class="modal-actions">
                 <button id="edit-listing-btn" class="btn-warning-action">✏️ Modyfikuj ogłoszenie</button>
                 <button id="delete-listing-btn" class="btn-danger-action">🗑️ Usuń całą ofertę</button>
-                <button type="button" class="btn-cancel-action" onclick="closeModals()">Zamknij</button>
+                <button type="button" class="btn-cancel-action" id="close-seller-modal">Zamknij</button>
             </div>
         </div>
     </div>

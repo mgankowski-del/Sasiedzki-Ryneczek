@@ -19,27 +19,29 @@ let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 
-// POMOCNICZA: DOSTĘPNOŚĆ
+// FUNKCJE POMOCNICZE
 const getRem = (name, total, res, ignoreIdx = null) => {
     let reserved = 0;
     res.forEach((r, idx) => { if (ignoreIdx !== null && idx === ignoreIdx) return; const item = r.items.find(i => i.name === name); if (item) reserved += parseFloat(item.qty); });
     return Math.max(0, total - reserved);
 };
 
-// --- OTWIERANIE MODALA DODAWANIA (NAPRAWIONE) ---
-const openAddModal = () => {
+window.closeModals = () => {
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+};
+
+// NAPRAWA PRZYCISKU DODAWANIA
+const openAddListing = () => {
     document.getElementById('modal-title').innerText = "Nowa oferta";
     document.getElementById('listing-form').reset();
     document.getElementById('products-to-add').innerHTML = '';
     document.getElementById('products-to-add').appendChild(createProductFields());
     document.getElementById('add-listing-modal').classList.remove('hidden');
 };
-// Rejestracja kliknięcia
-document.getElementById('btn-open-add').addEventListener('click', openAddModal);
 
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
-    div.className = 'product-item-form glass-card-dark';
+    div.className = 'product-item-form';
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
         <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
@@ -55,11 +57,22 @@ const createProductFields = (data = {}) => {
     return div;
 };
 
-document.getElementById('add-more-items').onclick = () => {
-    document.getElementById('products-to-add').appendChild(createProductFields());
-};
+// PODPIĘCIE ZDARZEŃ PO ZAŁADOWANIU DOM
+document.addEventListener('DOMContentLoaded', () => {
+    const btnAdd = document.getElementById('btn-open-add');
+    if (btnAdd) btnAdd.onclick = openAddListing;
 
-// --- ŁADOWANIE OGŁOSZEŃ ---
+    document.getElementById('add-more-items').onclick = () => {
+        document.getElementById('products-to-add').appendChild(createProductFields());
+    };
+
+    // Zamykanie przyciskami "Anuluj"
+    document.getElementById('close-add-modal').onclick = window.closeModals;
+    document.getElementById('close-res-modal').onclick = window.closeModals;
+    document.getElementById('close-seller-modal').onclick = window.closeModals;
+});
+
+// ŁADOWANIE OGŁOSZEŃ
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
@@ -88,7 +101,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     });
 });
 
-// --- LOGIKA ZAMÓWIENIA ---
+// LOGIKA ZAMÓWIENIA
 window.openOrderModal = async (id, editIdx = null) => {
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
@@ -115,7 +128,8 @@ window.updateSum = () => {
 };
 
 window.authSeller = async (id, pin) => {
-    if(prompt("Podaj PIN ogłoszenia:") !== pin) return alert("Błędny PIN");
+    const inputPin = prompt("Podaj PIN ogłoszenia:");
+    if(inputPin !== pin) return alert("Błędny PIN");
     currentEditId = id; const snap = await getDoc(doc(db, "listings", id)); cachedListingData = snap.data();
     renderSellerView('person'); document.getElementById('seller-modal').classList.remove('hidden');
 };
@@ -135,8 +149,8 @@ const renderSellerView = (type) => {
             }).join('');
             container.innerHTML += `<div class="res-product-row">
                 <div class="res-product-header"><span class="res-name">👤 ${r.buyerName}</span><small>⏰ ${r.time}</small></div>
-                ${itemsRows}<div class="res-total-line">Do zapłaty: ${pTotal.toFixed(2)} zł</div>
-                <button onclick="openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; margin-top:10px; font-size:0.85rem">✏️ Edytuj zamówienie sąsiada</button>
+                ${itemsRows}<div class="res-total-line">Suma: ${pTotal.toFixed(2)} zł</div>
+                <button onclick="openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; margin-top:10px; font-size:0.85rem">✏️ Edytuj</button>
             </div>`;
         });
     } else {
@@ -150,13 +164,54 @@ const renderSellerView = (type) => {
             container.innerHTML += `<div class="res-product-row">
                 <div class="res-product-header"><span class="res-name">📦 ${product.name}</span><span class="res-sold">Sprzedano: ${tSold}/${product.totalQty}</span></div>
                 ${bRows || '<div style="opacity:0.5; font-size:0.85rem">Brak zamówień</div>'}
-                <div class="res-total-line">Razem ze sprzedaży: ${pGrand.toFixed(2)} zł</div>
+                <div class="res-total-line">Razem: ${pGrand.toFixed(2)} zł</div>
             </div>`;
         });
     }
 };
 
-window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 document.getElementById('view-by-person').onclick = () => renderSellerView('person');
 document.getElementById('view-by-product').onclick = () => renderSellerView('product');
-document.getElementById('delete-listing-btn').onclick = async () => { if(confirm("Usunąć ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); } };
+
+document.getElementById('listing-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn'); btn.disabled = true;
+    const products = [];
+    document.querySelectorAll('.product-item-form').forEach(div => {
+        products.push({
+            name: div.querySelector('.p-name').value,
+            price: parseFloat(div.querySelector('.p-price').value),
+            unit: div.querySelector('.p-unit').value,
+            totalQty: parseFloat(div.querySelector('.p-total').value),
+            step: parseFloat(div.querySelector('.p-step').value)
+        });
+    });
+    const data = {
+        sellerName: document.getElementById('sellerName').value,
+        address: document.getElementById('pickupAddress').value,
+        pickupTimes: document.getElementById('pickupTimes').value,
+        pin: document.getElementById('pin').value,
+        items: products, createdAt: new Date(), reservations: []
+    };
+    await addDoc(collection(db, "listings"), data);
+    location.reload();
+};
+
+document.getElementById('confirm-booking-btn').onclick = async () => {
+    const name = document.getElementById('buyerName').value.trim();
+    const pin = document.getElementById('buyerPin').value.trim();
+    const items = [];
+    document.querySelectorAll('.order-qty-val').forEach(span => {
+        const q = parseFloat(span.innerText); if(q > 0) items.push({ name: span.dataset.name, qty: q });
+    });
+    if(!name || pin.length !== 4 || items.length === 0) return alert("Uzupełnij dane!");
+    const refL = doc(db, "listings", currentEditId);
+    const snap = await getDoc(refL);
+    let res = snap.data().reservations || [];
+    const newData = { buyerName: name, buyerPin: pin, time: document.getElementById('buyerPickupTime').value, items };
+    if (editingResIndex !== null) res[editingResIndex] = newData; else res.push(newData);
+    await updateDoc(refL, { reservations: res });
+    location.reload();
+};
+
+document.getElementById('delete-listing-btn').onclick = async () => { if(confirm("Usunąć?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); } };
