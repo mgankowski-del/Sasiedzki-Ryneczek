@@ -56,7 +56,7 @@
                             <input type="text" id="sellerName" placeholder="Kasia" required>
                         </div>
                         <div class="input-group">
-                            <label>PIN (do usuwania ogłoszenia)</label>
+                            <label>PIN (do podglądu i usuwania)</label>
                             <input type="password" id="pin" maxlength="4" placeholder="4 cyfry" required>
                         </div>
                     </div>
@@ -83,7 +83,7 @@
             <h3>Zarezerwuj produkt</h3>
             <p id="modal-product-info"></p>
             <div class="input-group">
-                <label>Twoje imię (dla sprzedawcy):</label>
+                <label>Twoje imię:</label>
                 <input type="text" id="buyerName" placeholder="Np. Marek z 3 piętra" required>
             </div>
             <div class="input-group">
@@ -92,15 +92,30 @@
             </div>
             <div class="modal-buttons">
                 <button id="confirm-booking-btn" class="btn-primary">Potwierdzam rezerwację</button>
-                <button id="close-modal-btn" class="btn-secondary">Anuluj</button>
+                <button onclick="closeModals()" class="btn-secondary">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="seller-modal" class="modal hidden">
+        <div class="modal-content glass-card seller-view">
+            <h3>Panel Sprzedawcy</h3>
+            <p id="seller-modal-product-title" style="font-weight: bold;"></p>
+            
+            <div id="reservations-container" class="reservations-panel">
+                </div>
+
+            <div class="modal-buttons" style="flex-direction: column;">
+                <button id="delete-listing-btn" class="btn-delete">Usuń to ogłoszenie</button>
+                <button onclick="closeModals()" class="btn-secondary">Zamknij</button>
             </div>
         </div>
     </div>
 
     <div id="success-modal" class="modal hidden">
-        <div class="modal-content glass-card success-view">
+        <div class="modal-content glass-card">
             <h2>🎉 Gotowe!</h2>
-            <p>Sąsiad otrzymał Twoją rezerwację.</p>
+            <p>Rezerwacja została zapisana.</p>
             <button id="add-to-calendar-btn" class="btn-calendar">📅 Dodaj do Kalendarza Google</button>
             <button onclick="location.reload()" class="btn-secondary">Zamknij</button>
         </div>

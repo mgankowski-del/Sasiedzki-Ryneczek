@@ -25,7 +25,6 @@ form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     const imageInput = document.getElementById('productImage');
-    
     if (!imageInput.files[0]) return alert("Wybierz zdjęcie!");
     btn.disabled = true; btn.innerText = "Publikowanie...";
 
@@ -44,17 +43,16 @@ form.addEventListener('submit', async (e) => {
             sellerName: document.getElementById('sellerName').value,
             pin: document.getElementById('pin').value,
             imageUrl: imageUrl,
-            reservations: [], // Tutaj będą wpadać zamówienia
+            reservations: [],
             createdAt: new Date()
         });
-
         form.reset();
-        alert("Ogłoszenie dodane!");
+        alert("Dodano!");
     } catch (err) { console.error(err); alert("Błąd!"); }
     finally { btn.disabled = false; btn.innerText = "Opublikuj ogłoszenie"; }
 });
 
-// POBIERANIE OGŁOSZEŃ I WYŚWIETLANIE
+// WYŚWIETLANIE LISTY (Z PRZYCISKIEM PODGLĄDU)
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     container.innerHTML = '';
     snap.forEach(documentSnapshot => {
@@ -62,16 +60,6 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         const id = documentSnapshot.id;
         const card = document.createElement('div');
         card.className = 'product-card';
-
-        // Budujemy listę rezerwacji (kto zamówił)
-        let resHtml = '';
-        if(item.reservations && item.reservations.length > 0) {
-            resHtml = `<div class="reservations-list"><h4>Sąsiedzi, którzy zamówili:</h4>`;
-            item.reservations.forEach(r => {
-                resHtml += `<div class="res-item">👤 ${r.name} - ⏰ ${r.time.replace('T', ' ')}</div>`;
-            });
-            resHtml += `</div>`;
-        }
 
         card.innerHTML = `
             <img src="${item.imageUrl}" class="product-image">
@@ -81,28 +69,46 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
                 <p>${item.description}</p>
                 <div class="pickup-tag">🏠 Sprzedawca: ${item.sellerName}<br>⏰ Odbiór: ${item.pickupTimes}</div>
                 <button class="btn-reserve" onclick="openBooking('${id}', '${item.title}', '${item.sellerName}')">Zarezerwuj</button>
-                ${resHtml}
-                <button class="btn-delete" onclick="deleteListing('${id}', '${item.pin}')">Usuń ogłoszenie</button>
+                <button class="btn-seller-preview" onclick="authSeller('${id}', '${item.pin}', '${item.title}', ${JSON.stringify(item.reservations).replace(/"/g, '&quot;')})">⚙️ Podgląd sprzedającego</button>
             </div>
         `;
         container.appendChild(card);
     });
 });
 
-// FUNKCJA USUWANIA
-window.deleteListing = async (id, correctPin) => {
-    const userPin = prompt("Podaj 4-cyfrowy PIN, aby usunąć ogłoszenie:");
+// WERYFIKACJA PINU I OTWARCIE PANELU
+window.authSeller = (id, correctPin, title, reservations) => {
+    const userPin = prompt("Podaj PIN Twojego ogłoszenia:");
     if (userPin === correctPin) {
-        if (confirm("Na pewno usunąć?")) {
-            await deleteDoc(doc(db, "listings", id));
-            alert("Usunięto!");
+        currentProductId = id;
+        document.getElementById('seller-modal-product-title').innerText = title;
+        const resContainer = document.getElementById('reservations-container');
+        
+        if (!reservations || reservations.length === 0) {
+            resContainer.innerHTML = "<p style='font-size:0.8rem; opacity:0.7;'>Brak rezerwacji.</p>";
+        } else {
+            resContainer.innerHTML = "<h4>Zamówienia:</h4>";
+            reservations.forEach(r => {
+                resContainer.innerHTML += `<div class="res-item-row">👤 ${r.name}<br><small>⏰ ${r.time.replace('T', ' ')}</small></div>`;
+            });
         }
+        
+        document.getElementById('seller-modal').classList.remove('hidden');
     } else {
         alert("Błędny PIN!");
     }
 };
 
-// REZERWACJA
+// USUWANIE
+document.getElementById('delete-listing-btn').onclick = async () => {
+    if (confirm("Czy na pewno chcesz usunąć to ogłoszenie i wszystkie zamówienia?")) {
+        await deleteDoc(doc(db, "listings", currentProductId));
+        closeModals();
+        alert("Ogłoszenie usunięte.");
+    }
+};
+
+// RESZTA FUNKCJI (REZERWACJA, KALENDARZ)
 window.openBooking = (id, title, seller) => {
     currentProductId = id;
     currentProductData = { title, seller };
@@ -110,33 +116,25 @@ window.openBooking = (id, title, seller) => {
     document.getElementById('reservation-modal').classList.remove('hidden');
 };
 
-document.getElementById('close-modal-btn').onclick = () => document.getElementById('reservation-modal').classList.add('hidden');
+window.closeModals = () => {
+    document.getElementById('reservation-modal').classList.add('hidden');
+    document.getElementById('seller-modal').classList.add('hidden');
+};
 
-// POTWIERDZENIE REZERWACJI - ZAPIS DO FIREBASE
 document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerName = document.getElementById('buyerName').value;
     const buyerTime = document.getElementById('buyerPickupTime').value;
-    
     if (!buyerName || !buyerTime) return alert("Wypełnij dane!");
-
-    const productRef = doc(db, "listings", currentProductId);
     
     try {
-        await updateDoc(productRef, {
-            reservations: arrayUnion({
-                name: buyerName,
-                time: buyerTime
-            })
+        await updateDoc(doc(db, "listings", currentProductId), {
+            reservations: arrayUnion({ name: buyerName, time: buyerTime })
         });
         document.getElementById('reservation-modal').classList.add('hidden');
         document.getElementById('success-modal').classList.remove('hidden');
-    } catch (err) {
-        console.error(err);
-        alert("Błąd rezerwacji!");
-    }
+    } catch (err) { alert("Błąd rezerwacji!"); }
 };
 
-// KALENDARZ
 document.getElementById('add-to-calendar-btn').onclick = () => {
     const time = document.getElementById('buyerPickupTime').value;
     const start = new Date(time).toISOString().replace(/-|:|\.\d\d\d/g, "");
