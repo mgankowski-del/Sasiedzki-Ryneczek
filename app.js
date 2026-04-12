@@ -20,6 +20,17 @@ let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 
+// OBLICZANIE DOSTĘPNOŚCI (Dynamicznie)
+const getRem = (productName, total, res, ignoreIndex = null) => {
+    let reserved = 0;
+    res.forEach((r, idx) => {
+        if (ignoreIndex !== null && idx === ignoreIndex) return;
+        const item = r.items.find(i => i.name === productName);
+        if (item) reserved += parseFloat(item.qty);
+    });
+    return Math.max(0, total - reserved);
+};
+
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-item-form glass-card-dark';
@@ -36,7 +47,7 @@ const createProductFields = (data = {}) => {
             </div>
         </div>
         <div class="row">
-            <div class="input-group"><label>Łączna ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+            <div class="input-group"><label>Łączna ilość na sprzedaż</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
             <div class="input-group">
                 <label>Krok/Podział</label>
                 <select class="p-step">
@@ -107,7 +118,20 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
             <div class="listing-header"><h3>Sprzedawca: ${d.sellerName}</h3><p>📍 ${d.address} | ⏰ ${d.pickupTimes}</p></div>
-            ${d.items.map(it => `<div class="product-item-list">${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} <div><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small></div></div>`).join('')}
+            ${d.items.map(it => {
+                const rem = getRem(it.name, it.totalQty, d.reservations);
+                return `
+                <div class="product-item-list">
+                    ${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} 
+                    <div style="flex:1">
+                        <b>${it.name}</b><br>
+                        <small>${it.price} zł / ${it.unit}</small><br>
+                        <span class="stock-tag ${rem > 0 ? 'stock-ok' : 'stock-none'}">
+                            ${rem > 0 ? `Pozostało: ${rem} ${it.unit}` : 'Wyprzedane'}
+                        </span>
+                    </div>
+                </div>`;
+            }).join('')}
             <div class="card-footer">
                 <button class="btn-primary" onclick="openOrderModal('${id}')">🛒 Zamów / Zmień</button>
                 <button class="btn-manage" onclick="authSeller('${id}', '${d.pin}')">⚙️ Panel</button>
@@ -124,26 +148,41 @@ window.openOrderModal = async (id, editIdx = null) => {
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
     
     d.items.forEach((it) => {
+        // Obliczamy max dostępność ignorując własne stare zamówienie przy edycji
+        const rem = getRem(it.name, it.totalQty, d.reservations, editingResIndex);
+        const startVal = (editingResIndex !== null) ? (d.reservations[editingResIndex].items.find(i => i.name === it.name)?.qty || 0) : 0;
+        
         const row = document.createElement('div'); row.className = 'product-item-list';
-        row.innerHTML = `<span style="flex:1">${it.name}</span><div class="qty-control"><button class="qty-btn" onclick="this.nextElementSibling.stepDown(); updateSum()">-</button><input type="number" class="order-qty" data-name="${it.name}" data-price="${it.price}" step="${it.step}" value="0" min="0" onchange="updateSum()" readonly><button class="qty-btn" onclick="this.previousElementSibling.stepUp(); updateSum()">+</button></div>`;
+        row.innerHTML = `
+            <div style="flex:1">
+                <b>${it.name}</b><br>
+                <small style="color:#64748b">Dostępne: ${rem} ${it.unit}</small>
+            </div>
+            <div class="qty-control">
+                <button class="qty-btn" onclick="this.nextElementSibling.stepDown(); updateSum()">-</button>
+                <input type="number" class="order-qty" data-name="${it.name}" data-price="${it.price}" data-max="${rem}" step="${it.step}" value="${startVal}" min="0" onchange="updateSum()" readonly>
+                <button class="qty-btn" onclick="if(parseFloat(this.previousElementSibling.value) + parseFloat(this.previousElementSibling.step) <= ${rem}) { this.previousElementSibling.stepUp(); updateSum(); } else { alert('Brak większej ilości!'); }">+</button>
+            </div>
+        `;
         container.appendChild(row);
     });
 
-    // PAMIĘĆ URZĄDZENIA (LocalStorage)
     const savedName = localStorage.getItem('ryneczek_name');
     const savedPin = localStorage.getItem('ryneczek_pin');
 
-    if (savedName && savedPin && editIdx === null) {
+    if (savedName && savedPin && editingResIndex === null) {
         document.getElementById('buyerName').value = savedName;
         document.getElementById('buyerPin').value = savedPin;
-        // Automatyczne sprawdzenie zamówienia
         lookUpOrder();
+    } else if (editingResIndex !== null) {
+        document.getElementById('buyerName').value = d.reservations[editingResIndex].buyerName;
+        document.getElementById('buyerPin').value = d.reservations[editingResIndex].buyerPin;
+        document.getElementById('buyerPickupTime').value = d.reservations[editingResIndex].time;
     } else {
         document.getElementById('buyerName').value = '';
         document.getElementById('buyerPin').value = '';
         document.getElementById('buyerPickupTime').value = '';
         document.getElementById('buyer-status-msg').innerText = "💡 Podaj imię i PIN, by złożyć zamówienie.";
-        document.getElementById('buyer-status-msg').className = "info-text";
     }
 
     document.getElementById('reservation-modal').classList.remove('hidden');
@@ -156,19 +195,16 @@ const lookUpOrder = () => {
     const msg = document.getElementById('buyer-status-msg');
 
     if (name.length > 2 && pin.length === 4) {
-        const existing = cachedListingData.reservations.find(r => r.buyerName.toLowerCase() === name && r.buyerPin === pin);
-        if (existing) {
-            msg.innerText = `✅ Cześć ${existing.buyerName}! Rozpoznaliśmy Cię. Twoje zamówienie jest poniżej.`;
+        const idx = cachedListingData.reservations.findIndex(r => r.buyerName.toLowerCase() === name && r.buyerPin === pin);
+        if (idx !== -1) {
+            editingResIndex = idx;
+            const existing = cachedListingData.reservations[idx];
+            msg.innerText = `✅ Cześć ${existing.buyerName}! Twoje zamówienie zostało załadowane.`;
             msg.className = "info-text info-found";
             document.getElementById('buyerPickupTime').value = existing.time;
-            document.querySelectorAll('.order-qty').forEach(input => {
-                const foundItem = existing.items.find(i => i.name === input.dataset.name);
-                input.value = foundItem ? foundItem.qty : 0;
-            });
-            updateSum();
-        } else {
-            msg.innerText = "💡 Składasz nowe zamówienie. Zapamiętamy Twoje dane na tym urządzeniu.";
-            msg.className = "info-text";
+            
+            // Odświeżamy widok, żeby uwzględnić limity (getRem)
+            openOrderModal(currentEditId, idx);
         }
     }
 };
@@ -193,18 +229,15 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
 
     if(!buyerName || buyerPin.length !== 4 || items.length === 0) return alert("Wypełnij dane!");
 
-    // ZAPISZ W PAMIĘCI URZĄDZENIA
     localStorage.setItem('ryneczek_name', buyerName);
     localStorage.setItem('ryneczek_pin', buyerPin);
 
     const refListing = doc(db, "listings", currentEditId); 
     const snap = await getDoc(refListing);
     let res = snap.data().reservations;
-    const existingIndex = res.findIndex(r => r.buyerName.toLowerCase() === buyerName.toLowerCase());
     
-    if (existingIndex !== -1) {
-        if (res[existingIndex].buyerPin !== buyerPin) return alert("Błędny PIN!");
-        res[existingIndex] = { buyerName, buyerPin, time, items };
+    if (editingResIndex !== null) {
+        res[editingResIndex] = { buyerName, buyerPin, time, items };
     } else {
         res.push({ buyerName, buyerPin, time, items });
     }
