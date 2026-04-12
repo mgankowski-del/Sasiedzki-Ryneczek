@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-// Dane z Twojego screena
 const firebaseConfig = {
     apiKey: "AIzaSyD_cuGXokb55W6W4aB-QkV0c_jAqXkJQgk",
     authDomain: "sasiedzki-ryneczek.firebaseapp.com",
@@ -20,97 +19,89 @@ const form = document.getElementById('listing-form');
 const container = document.getElementById('listings-container');
 let currentProduct = null;
 
-// DODAWANIE OGŁOSZENIA
+// OBSŁUGA FORMULARZA
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     const imageInput = document.getElementById('productImage');
     
-    if (!imageInput.files[0]) {
-        alert("Proszę wybrać zdjęcie!");
-        return;
-    }
+    if (!imageInput.files[0]) return alert("Wybierz zdjęcie!");
 
     btn.disabled = true;
     btn.innerText = "Publikowanie...";
 
-    const imageFile = imageInput.files[0];
-    const title = document.getElementById('title').value;
-    const price = document.getElementById('price').value;
-    const unit = document.getElementById('unit').value;
-    const pickupTimes = document.getElementById('pickupTimes').value;
-    const description = document.getElementById('description').value;
-    const sellerName = document.getElementById('sellerName').value;
-    const pin = document.getElementById('pin').value;
+    const data = {
+        title: document.getElementById('title').value,
+        price: document.getElementById('price').value,
+        unit: document.getElementById('unit').value,
+        pickupTimes: document.getElementById('pickupTimes').value,
+        description: document.getElementById('description').value,
+        sellerName: document.getElementById('sellerName').value,
+        pin: document.getElementById('pin').value,
+        createdAt: new Date()
+    };
 
     try {
-        // Wgrywanie zdjęcia
-        const imageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
-        const uploadResult = await uploadBytes(imageRef, imageFile);
-        const imageUrl = await getDownloadURL(uploadResult.ref);
+        const file = imageInput.files[0];
+        const imageRef = ref(storage, `products/${Date.now()}_${file.name}`);
+        const snapshot = await uploadBytes(imageRef, file);
+        data.imageUrl = await getDownloadURL(snapshot.ref);
 
-        // Zapis do bazy
-        await addDoc(collection(db, "listings"), {
-            title, price, unit, pickupTimes, description, sellerName, pin, imageUrl,
-            createdAt: new Date()
-        });
-
+        await addDoc(collection(db, "listings"), data);
         form.reset();
-        alert("Ogłoszenie dodane pomyślnie!");
+        alert("Ogłoszenie dodane!");
     } catch (err) {
-        console.error("Błąd Firebase:", err);
-        alert("Wystąpił błąd. Sprawdź czy Storage i Firestore mają aktywne reguły 'allow write: if true'");
+        console.error(err);
+        alert("Wystąpił błąd podczas wysyłania.");
     } finally {
         btn.disabled = false;
         btn.innerText = "Opublikuj ogłoszenie";
     }
 });
 
-// POBIERANIE LISTY
+// POBIERANIE DANYCH
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     container.innerHTML = '';
     snap.forEach(doc => {
         const item = doc.data();
         const card = document.createElement('div');
-        card.className = 'product-card glass-card-dark'; // Upewnij się, że masz style dla kart
-        card.style.background = "white"; card.style.color = "#333"; card.style.borderRadius = "15px"; card.style.padding = "10px"; card.style.marginBottom = "15px";
-
+        card.className = 'product-card';
         card.innerHTML = `
-            <img src="${item.imageUrl}" style="width:100%; height:180px; object-fit:cover; border-radius:10px;">
-            <div style="padding:10px;">
-                <h3 style="margin:5px 0;">${item.title}</h3>
-                <strong style="color:#4f46e5;">${item.price} zł / ${item.unit}</strong>
-                <p style="font-size:0.9rem;">${item.description}</p>
-                <div style="background:#f3f4f6; padding:8px; border-radius:8px; font-size:0.8rem;">
-                    🏠 ${item.sellerName} | ⏰ ${item.pickupTimes}
-                </div>
-                <button class="btn-reserve" onclick="openBooking('${item.title}', '${item.sellerName}')" style="width:100%; background:#10b981; color:white; margin-top:10px;">Zarezerwuj</button>
+            <img src="${item.imageUrl}" class="product-image">
+            <div class="product-info">
+                <div class="product-price">${item.price} zł / ${item.unit}</div>
+                <h3>${item.title}</h3>
+                <p>${item.description}</p>
+                <div class="pickup-tag">🏠 U kogo: ${item.sellerName}<br>⏰ Odbiór: ${item.pickupTimes}</div>
+                <button class="btn-reserve" onclick="openBooking('${item.title}', '${item.sellerName}')">Zarezerwuj</button>
             </div>
         `;
         container.appendChild(card);
     });
 });
 
-// MODALE
+// REZERWACJA I KALENDARZ
 window.openBooking = (title, seller) => {
     currentProduct = { title, seller };
     document.getElementById('modal-product-info').innerText = `${title} od ${seller}`;
     document.getElementById('reservation-modal').classList.remove('hidden');
 };
 
-document.getElementById('close-modal-btn').onclick = () => document.getElementById('reservation-modal').classList.add('hidden');
+document.getElementById('close-modal-btn').onclick = () => {
+    document.getElementById('reservation-modal').classList.add('hidden');
+};
 
 document.getElementById('confirm-booking-btn').onclick = () => {
     const time = document.getElementById('buyerPickupTime').value;
-    if(!time) return alert("Wybierz godzinę!");
+    if (!time) return alert("Wybierz godzinę!");
     document.getElementById('reservation-modal').classList.add('hidden');
     document.getElementById('success-modal').classList.remove('hidden');
 };
 
 document.getElementById('add-to-calendar-btn').onclick = () => {
     const time = document.getElementById('buyerPickupTime').value;
-    const date = new Date(time).toISOString().replace(/-|:|\.\d\d\d/g, "");
+    const start = new Date(time).toISOString().replace(/-|:|\.\d\d\d/g, "");
     const end = new Date(new Date(time).getTime() + 1800000).toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Odbiór: ' + currentProduct.title)}&dates=${date}/${end}&details=${encodeURIComponent('U: ' + currentProduct.seller)}&sf=true&output=xml`;
+    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Odbiór: ' + currentProduct.title)}&dates=${start}/${end}&details=${encodeURIComponent('Odbiór od: ' + currentProduct.seller)}&sf=true&output=xml`;
     window.open(url, '_blank');
 };

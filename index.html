@@ -34,26 +34,26 @@
                     </div>
 
                     <div class="input-group">
-                        <label>Kiedy można odebrać?</label>
-                        <input type="text" id="pickupTimes" placeholder="np. Jutro po 17:00" required>
+                        <label>Dostępność (Kiedy można odebrać?)</label>
+                        <input type="text" id="pickupTimes" placeholder="np. Poniedziałek 17-20" required>
                     </div>
 
                     <div class="input-group">
-                        <label>Opis / Alergeny</label>
+                        <label>Opis i składniki</label>
                         <textarea id="description" placeholder="Opisz swój produkt..." required></textarea>
                     </div>
 
                     <div class="input-group">
                         <label class="file-label">
-        <span>📷 Wybierz zdjęcie (JPG, PNG, WebP)</span>
-        <input type="file" id="productImage" accept=".jpg, .jpeg, .png, .webp, .JPG, .JPEG, .PNG, .WEBP" required>
-    </label>
+                            <span>📷 Wybierz zdjęcie (Dowolny format)</span>
+                            <input type="file" id="productImage" required>
+                        </label>
                     </div>
 
                     <div class="row">
                         <div class="input-group">
                             <label>Twoje Imię</label>
-                            <input type="text" id="sellerName" placeholder="Michał" required>
+                            <input type="text" id="sellerName" placeholder="Kasia z 4 piętra" required>
                         </div>
                         <div class="input-group">
                             <label>PIN (do usuwania)</label>
@@ -72,6 +72,10 @@
                 </div>
             </section>
         </main>
+
+        <footer>
+            <p>&copy; 2026 Sąsiedzki Ryneczek</p>
+        </footer>
     </div>
 
     <div id="reservation-modal" class="modal hidden">
@@ -79,11 +83,11 @@
             <h3>Zarezerwuj produkt</h3>
             <p id="modal-product-info"></p>
             <div class="input-group">
-                <label>Kiedy przyjdziesz po odbiór?</label>
+                <label>O której godzinie przyjdziesz?</label>
                 <input type="datetime-local" id="buyerPickupTime" required>
             </div>
             <div class="modal-buttons">
-                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam</button>
+                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam rezerwację</button>
                 <button id="close-modal-btn" class="btn-secondary">Anuluj</button>
             </div>
         </div>
@@ -92,8 +96,8 @@
     <div id="success-modal" class="modal hidden">
         <div class="modal-content glass-card">
             <h2>🎉 Zarezerwowano!</h2>
-            <p>Dodaj termin do kalendarza:</p>
-            <button id="add-to-calendar-btn" class="btn-calendar">📅 Dodaj do Kalendarza</button>
+            <p>Dodaj termin do kalendarza, żeby nie zapomnieć:</p>
+            <button id="add-to-calendar-btn" class="btn-calendar">📅 Dodaj do Kalendarza Google</button>
             <button onclick="location.reload()" class="btn-secondary">Zamknij</button>
         </div>
     </div>
