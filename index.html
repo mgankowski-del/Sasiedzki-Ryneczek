@@ -11,112 +11,117 @@
         <header>
             <h1>Sąsiedzki Ryneczek</h1>
             <p class="subtitle">Domowe produkty od Twoich sąsiadów</p>
+            <button id="open-add-listing-btn" class="btn-add-main">➕ Dodaj swoje ogłoszenie</button>
         </header>
 
         <main>
-            <section id="add-listing" class="glass-card">
-                <h2>Opublikuj nową ofertę</h2>
-                <form id="listing-form">
-                    <div class="input-group">
-                        <label>Tytuł ogłoszenia</label>
-                        <input type="text" id="listing-title" placeholder="np. Domowa Piekarnia u Michała" required>
-                    </div>
-
-                    <div id="products-to-add">
-                        <div class="product-item-form glass-card-dark">
-                            <div class="input-group">
-                                <label>Nazwa produktu</label>
-                                <input type="text" class="p-name" placeholder="np. Chleb wiejski" required>
-                            </div>
-                            <div class="row">
-                                <div class="input-group">
-                                    <label>Cena za jednostkę (zł)</label>
-                                    <input type="number" class="p-price" step="0.01" placeholder="15.00" required>
-                                </div>
-                                <div class="input-group">
-                                    <label>Jednostka (szt/kg/g)</label>
-                                    <input type="text" class="p-unit" placeholder="szt" required>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="input-group">
-                                    <label>Łączna ilość na sprzedaż</label>
-                                    <input type="number" class="p-total" step="0.01" required>
-                                </div>
-                                <div class="input-group">
-                                    <label>Minimalny skok (np. 0.5 kg lub 1 szt)</label>
-                                    <input type="number" class="p-step" step="0.01" required>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt</button>
-
-                    <div class="input-group" style="margin-top: 20px;">
-                        <label>Terminy odbioru</label>
-                        <input type="text" id="pickupTimes" placeholder="np. Piątek po 18, Sobota rano" required>
-                    </div>
-
-                    <div class="input-group">
-                        <label class="file-label">
-                            <span>📷 Zdjęcie poglądowe</span>
-                            <input type="file" id="productImage" required>
-                        </label>
-                    </div>
-
-                    <div class="row">
-                        <div class="input-group">
-                            <label>Twoje Imię</label>
-                            <input type="text" id="sellerName" placeholder="Michał" required>
-                        </div>
-                        <div class="input-group">
-                            <label>PIN (4 cyfry)</label>
-                            <input type="password" id="pin" maxlength="4" required>
-                        </div>
-                    </div>
-
-                    <button type="submit" id="submitBtn">Opublikuj ogłoszenie</button>
-                </form>
-            </section>
-
             <section id="listings">
                 <h2>Aktualne pyszności</h2>
-                <div id="listings-container"></div>
+                <div id="listings-container">
+                    <p class="loading">Ładowanie...</p>
+                </div>
             </section>
         </main>
+
+        <footer>
+            <p>&copy; 2026 Sąsiedzki Ryneczek</p>
+        </footer>
+    </div>
+
+    <div id="add-listing-modal" class="modal hidden">
+        <div class="modal-content modal-solid scrollable-modal">
+            <h2>Nowa oferta</h2>
+            <form id="listing-form">
+                <div class="input-group">
+                    <label>Tytuł ogłoszenia</label>
+                    <input type="text" id="listing-title" placeholder="np. Domowe Wypieki" required>
+                </div>
+
+                <div id="products-to-add">
+                    <div class="product-item-form glass-card-dark">
+                        <div class="input-group">
+                            <label>Nazwa produktu</label>
+                            <input type="text" class="p-name" placeholder="np. Chleb" required>
+                        </div>
+                        <div class="row">
+                            <div class="input-group">
+                                <label>Cena (zł)</label>
+                                <input type="number" class="p-price" step="0.01" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Jednostka</label>
+                                <input type="text" class="p-unit" placeholder="szt" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="input-group">
+                                <label>Ilość</label>
+                                <input type="number" class="p-total" step="0.01" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Krok</label>
+                                <input type="number" class="p-step" step="0.01" value="1" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt</button>
+
+                <div class="input-group" style="margin-top: 20px;">
+                    <label>Kiedy odbiór?</label>
+                    <input type="text" id="pickupTimes" placeholder="np. Sobota 10-12" required>
+                </div>
+
+                <div class="input-group">
+                    <label class="file-label">
+                        <span>📷 Zdjęcie zbiorcze</span>
+                        <input type="file" id="productImage" required>
+                    </label>
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label>Twoje Imię</label>
+                        <input type="text" id="sellerName" required>
+                    </div>
+                    <div class="input-group">
+                        <label>PIN (4 cyfry)</label>
+                        <input type="password" id="pin" maxlength="4" required>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn-primary">Opublikuj ogłoszenie</button>
+                <button type="button" onclick="closeModals()" class="btn-cancel">Anuluj</button>
+            </form>
+        </div>
     </div>
 
     <div id="reservation-modal" class="modal hidden">
         <div class="modal-content modal-solid">
-            <h3>Co zamawiasz?</h3>
+            <h3>Twoje zamówienie</h3>
             <div id="modal-order-items"></div>
-            
-            <div class="total-summary">
-                Suma do zapłaty: <span id="modal-total-price">0.00</span> zł
-            </div>
-
+            <div class="total-summary">Suma: <span id="modal-total-price">0.00</span> zł</div>
             <div class="input-group">
                 <label>Twoje imię:</label>
-                <input type="text" id="buyerName" placeholder="Jak sąsiad ma Cię podpisać?" required>
+                <input type="text" id="buyerName" required>
             </div>
             <div class="input-group">
                 <label>Kiedy wpadniesz?</label>
-                <input type="text" id="buyerPickupTime" placeholder="np. Wstąpię jutro około 10" required>
+                <input type="text" id="buyerPickupTime" required>
             </div>
-            
             <div class="modal-buttons">
-                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam zamówienie</button>
+                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam</button>
                 <button onclick="closeModals()" class="btn-cancel">Anuluj</button>
             </div>
         </div>
     </div>
 
     <div id="seller-modal" class="modal hidden">
-        <div class="modal-content modal-solid seller-view">
-            <h3>Lista zamówień</h3>
+        <div class="modal-content modal-solid">
+            <h3>Lista rezerwacji</h3>
             <div id="reservations-container" class="reservations-panel"></div>
-            <button id="delete-listing-btn" class="btn-delete">Zdejmij ogłoszenie z tablicy</button>
+            <button id="delete-listing-btn" class="btn-delete">Usuń ogłoszenie</button>
             <button onclick="closeModals()" class="btn-cancel">Zamknij</button>
         </div>
     </div>

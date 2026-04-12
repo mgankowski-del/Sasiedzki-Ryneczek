@@ -15,13 +15,18 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-const calculateRemaining = (productName, totalQty, reservations) => {
+// OTWIERANIE MODALA DODAWANIA
+document.getElementById('open-add-listing-btn').onclick = () => {
+    document.getElementById('add-listing-modal').classList.remove('hidden');
+};
+
+const getRem = (name, total, res) => {
     let reserved = 0;
-    reservations.forEach(res => {
-        const found = res.items.find(ri => ri.name === productName);
-        if (found) reserved += found.qty;
+    res.forEach(r => {
+        const item = r.items.find(i => i.name === name);
+        if (item) reserved += item.qty;
     });
-    return Math.max(0, totalQty - reserved);
+    return Math.max(0, total - reserved);
 };
 
 document.getElementById('add-more-items').onclick = () => {
@@ -68,16 +73,12 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     snap.forEach(docSnap => {
         const d = docSnap.data();
         const id = docSnap.id;
-        
         const itemsHtml = d.items.map(it => {
-            const rem = calculateRemaining(it.name, it.totalQty, d.reservations);
+            const rem = getRem(it.name, it.totalQty, d.reservations);
             return `
                 <div class="item-status-row">
-                    <div>
-                        <b>${it.name}</b><br>
-                        <small style="color:#64748b">${rem > 0 ? `Dostępne: ${rem} ${it.unit}` : '<span class="sold-out-text">Wszystko sprzedane</span>'}</small>
-                    </div>
-                    <span>${it.price} zł / ${it.unit}</span>
+                    <div><b>${it.name}</b><br><small style="color:#64748b">${rem > 0 ? `Zostało: ${rem} ${it.unit}` : 'Wyprzedane'}</small></div>
+                    <span>${it.price} zł/${it.unit}</span>
                 </div>
             `;
         }).join('');
@@ -87,11 +88,11 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         card.innerHTML = `
             <img src="${d.imageUrl}" class="product-image">
             <div class="product-info">
-                <h3 style="margin:0 0 10px 0">${d.title}</h3>
+                <h3>${d.title}</h3>
                 <div style="font-size:0.85rem; color:#64748b; margin-bottom:15px">🏠 ${d.sellerName} | ⏰ ${d.pickupTimes}</div>
                 <div>${itemsHtml}</div>
-                <button class="btn-primary" onclick="openOrderModal('${id}')" style="margin-top:15px">Zarezerwuj teraz</button>
-                <button class="btn-secondary" onclick="authSeller('${id}', '${d.pin}')" style="width:100%; margin-top:10px; color:#475569">⚙️ Zarządzaj ogłoszeniem</button>
+                <button class="btn-primary" onclick="openOrderModal('${id}')" style="margin-top:15px">Zarezerwuj</button>
+                <button class="btn-cancel" onclick="authSeller('${id}', '${d.pin}')">Zarządzaj</button>
             </div>
         `;
         list.appendChild(card);
@@ -108,24 +109,17 @@ window.openOrderModal = (id) => {
         const container = document.getElementById('modal-order-items');
         container.innerHTML = '';
         orderState = {};
-
         d.items.forEach((it, index) => {
-            const rem = calculateRemaining(it.name, it.totalQty, d.reservations);
+            const rem = getRem(it.name, it.totalQty, d.reservations);
             orderState[index] = { qty: 0, price: it.price, step: it.step, name: it.name, unit: it.unit, max: rem };
-            
             const row = document.createElement('div');
             row.className = 'qty-row';
-            row.innerHTML = `
-                <div class="qty-info">
-                    <b>${it.name}</b>
-                    <span class="qty-available">Pozostało: ${rem} ${it.unit}</span>
-                </div>
+            row.innerHTML = `<div><b>${it.name}</b><br><small>Dostępne: ${rem}</small></div>
                 <div class="qty-control">
-                    <button class="qty-btn" onclick="updateQty(${index}, -1)" ${rem <= 0 ? 'disabled' : ''}>-</button>
-                    <span class="qty-val" id="modal-qty-${index}">0 ${it.unit}</span>
-                    <button class="qty-btn" id="plus-${index}" onclick="updateQty(${index}, 1)" ${rem <= 0 ? 'disabled' : ''}>+</button>
-                </div>
-            `;
+                    <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                    <span id="mqty-${index}">0 ${it.unit}</span>
+                    <button class="qty-btn" id="pbtn-${index}" onclick="updateQty(${index}, 1)">+</button>
+                </div>`;
             container.appendChild(row);
         });
         document.getElementById('reservation-modal').classList.remove('hidden');
@@ -135,11 +129,9 @@ window.openOrderModal = (id) => {
 window.updateQty = (index, dir) => {
     const s = orderState[index];
     const newVal = Math.max(0, s.qty + (dir * s.step));
-    if (newVal > s.max) return alert("Brak większej ilości!");
+    if (newVal > s.max) return alert("Brak towaru!");
     s.qty = newVal;
-    document.getElementById(`modal-qty-${index}`).innerText = `${newVal.toFixed(2)} ${s.unit}`;
-    document.getElementById(`plus-${index}`).disabled = (newVal + s.step > s.max);
-
+    document.getElementById(`mqty-${index}`).innerText = `${newVal.toFixed(2)} ${s.unit}`;
     let total = 0;
     Object.values(orderState).forEach(o => total += o.qty * o.price);
     document.getElementById('modal-total-price').innerText = total.toFixed(2);
@@ -149,8 +141,7 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerName = document.getElementById('buyerName').value;
     const time = document.getElementById('buyerPickupTime').value;
     const ordered = Object.values(orderState).filter(o => o.qty > 0);
-    if(!buyerName || ordered.length === 0) return alert("Podaj imię i wybierz produkty!");
-
+    if(!buyerName || ordered.length === 0) return alert("Wybierz produkty!");
     await updateDoc(doc(db, "listings", currentListingId), {
         reservations: arrayUnion({ buyerName, time, items: ordered.map(o => ({ name: o.name, qty: o.qty })) })
     });
@@ -163,25 +154,18 @@ window.authSeller = (id, pin) => {
     onSnapshot(doc(db, "listings", id), (snap) => {
         const d = snap.data();
         const resCont = document.getElementById('reservations-container');
-        resCont.innerHTML = `<h4 style="color:#818cf8; margin-bottom:15px">Zamówienia:</h4>`;
+        resCont.innerHTML = '<h4>Zamówienia:</h4>';
         d.reservations.forEach(r => {
             const listStr = r.items.map(i => `${i.qty}x ${i.name}`).join(', ');
-            resCont.innerHTML += `
-                <div style="background:#0f172a; padding:12px; border-radius:12px; margin-bottom:10px; border-left:4px solid var(--primary)">
-                    <b style="color:#cbd5e1">${r.buyerName}</b><br>
-                    <span style="font-size:0.9rem">${listStr}</span><br>
-                    <small style="color:#64748b">🕒 ${r.time}</small>
-                </div>`;
+            resCont.innerHTML += `<div style="background:#0f172a; padding:10px; border-radius:10px; margin-bottom:10px">
+                <b>${r.buyerName}</b>: ${listStr}<br><small>⏰ ${r.time}</small></div>`;
         });
         document.getElementById('seller-modal').classList.remove('hidden');
     });
 };
 
 document.getElementById('delete-listing-btn').onclick = async () => {
-    if(confirm("Usunąć ogłoszenie?")) {
-        await deleteDoc(doc(db, "listings", currentListingId));
-        location.reload();
-    }
+    if(confirm("Usunąć ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentListingId)); location.reload(); }
 };
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
