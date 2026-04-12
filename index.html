@@ -10,35 +10,26 @@
     <div class="app-container">
         <header class="main-header">
             <h1>Sąsiedzki Ryneczek</h1>
-            <p class="subtitle">Domowe produkty od Twoich sąsiadów</p>
+            <p class="subtitle">Domowe produkty od sąsiadów</p>
             <div class="top-action">
                 <button id="btn-open-add" class="btn-add-main">➕ Opublikuj nową ofertę</button>
             </div>
         </header>
 
         <main id="listings-container">
-            <p class="status-msg">Ładowanie świeżych ofert...</p>
+            <p class="status-msg">Ładowanie ofert...</p>
         </main>
     </div>
 
     <div id="add-listing-modal" class="modal hidden">
         <div class="modal-content modal-solid scrollable-modal">
-            <h2 id="modal-title">Nowa oferta</h2>
+            <h2>Nowa oferta</h2>
             <form id="listing-form">
                 <div class="form-grid">
-                    <div class="input-group">
-                        <label>Twoje Imię</label>
-                        <input type="text" id="sellerName" placeholder="Np. Michał" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Adres odbioru</label>
-                        <input type="text" id="pickupAddress" placeholder="Np. ul. Polna 4" required>
-                    </div>
+                    <div class="input-group"><label>Twoje Imię</label><input type="text" id="sellerName" placeholder="Np. Michał" required></div>
+                    <div class="input-group"><label>Adres odbioru</label><input type="text" id="pickupAddress" placeholder="Np. ul. Polna 4" required></div>
                 </div>
-                <div class="input-group">
-                    <label>Możliwe godziny odbioru</label>
-                    <input type="text" id="pickupTimes" placeholder="Np. Pon-Pt 17-20" required>
-                </div>
+                <div class="input-group"><label>Możliwe godziny odbioru</label><input type="text" id="pickupTimes" placeholder="Np. Pon-Pt 17-20" required></div>
                 <hr class="divider">
                 
                 <div id="products-to-add"></div>
@@ -63,24 +54,12 @@
             <h3>Twoje zamówienie</h3>
             <p id="buyer-status-msg" class="info-note">💡 Podaj imię i PIN, by zamówić lub zmienić.</p>
             <div id="modal-order-items"></div>
-            <div class="total-bar">
-                <span>Razem:</span>
-                <span><span id="modal-total-price">0.00</span> zł</span>
-            </div>
+            <div class="total-bar"><span>Razem:</span><span><span id="modal-total-price">0.00</span> zł</span></div>
             <div class="form-grid">
-                <div class="input-group">
-                    <label>Twoje imię:</label>
-                    <input type="text" id="buyerName" required>
-                </div>
-                <div class="input-group">
-                    <label>Twój PIN (4 cyfry):</label>
-                    <input type="text" id="buyerPin" maxlength="4" required>
-                </div>
+                <div class="input-group"><label>Twoje imię</label><input type="text" id="buyerName" required></div>
+                <div class="input-group"><label>PIN (4 cyfry)</label><input type="text" id="buyerPin" maxlength="4" required></div>
             </div>
-            <div class="input-group">
-                <label>Kiedy odbierzesz?</label>
-                <input type="text" id="buyerPickupTime" placeholder="Np. Jutro o 10:00" required>
-            </div>
+            <div class="input-group"><label>Kiedy odbierzesz?</label><input type="text" id="buyerPickupTime" required></div>
             <div class="modal-actions">
                 <button id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
                 <button type="button" class="btn-cancel-action" onclick="closeModals()">Anuluj</button>
