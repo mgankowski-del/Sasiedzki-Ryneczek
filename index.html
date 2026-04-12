@@ -35,17 +35,17 @@
 
                     <div class="input-group">
                         <label>Dostępność (Kiedy można odebrać?)</label>
-                        <input type="text" id="pickupTimes" placeholder="np. Poniedziałek 17-20" required>
+                        <input type="text" id="pickupTimes" placeholder="np. Codziennie po 18:00" required>
                     </div>
 
                     <div class="input-group">
                         <label>Opis i składniki</label>
-                        <textarea id="description" placeholder="Opisz swój produkt..." required></textarea>
+                        <textarea id="description" placeholder="Opisz produkt..." required></textarea>
                     </div>
 
                     <div class="input-group">
                         <label class="file-label">
-                            <span>📷 Wybierz zdjęcie (Dowolny format)</span>
+                            <span>📷 Dodaj zdjęcie</span>
                             <input type="file" id="productImage" required>
                         </label>
                     </div>
@@ -53,10 +53,10 @@
                     <div class="row">
                         <div class="input-group">
                             <label>Twoje Imię</label>
-                            <input type="text" id="sellerName" placeholder="Kasia z 4 piętra" required>
+                            <input type="text" id="sellerName" placeholder="Kasia" required>
                         </div>
                         <div class="input-group">
-                            <label>PIN (do usuwania)</label>
+                            <label>PIN (do usuwania ogłoszenia)</label>
                             <input type="password" id="pin" maxlength="4" placeholder="4 cyfry" required>
                         </div>
                     </div>
@@ -68,7 +68,7 @@
             <section id="listings">
                 <h2>Aktualne ogłoszenia</h2>
                 <div id="listings-container">
-                    <p class="loading">Ładowanie ogłoszeń...</p>
+                    <p class="loading">Ładowanie...</p>
                 </div>
             </section>
         </main>
@@ -83,7 +83,11 @@
             <h3>Zarezerwuj produkt</h3>
             <p id="modal-product-info"></p>
             <div class="input-group">
-                <label>O której godzinie przyjdziesz?</label>
+                <label>Twoje imię (dla sprzedawcy):</label>
+                <input type="text" id="buyerName" placeholder="Np. Marek z 3 piętra" required>
+            </div>
+            <div class="input-group">
+                <label>Kiedy przyjdziesz?</label>
                 <input type="datetime-local" id="buyerPickupTime" required>
             </div>
             <div class="modal-buttons">
@@ -94,9 +98,9 @@
     </div>
 
     <div id="success-modal" class="modal hidden">
-        <div class="modal-content glass-card">
-            <h2>🎉 Zarezerwowano!</h2>
-            <p>Dodaj termin do kalendarza, żeby nie zapomnieć:</p>
+        <div class="modal-content glass-card success-view">
+            <h2>🎉 Gotowe!</h2>
+            <p>Sąsiad otrzymał Twoją rezerwację.</p>
             <button id="add-to-calendar-btn" class="btn-calendar">📅 Dodaj do Kalendarza Google</button>
             <button onclick="location.reload()" class="btn-secondary">Zamknij</button>
         </div>
