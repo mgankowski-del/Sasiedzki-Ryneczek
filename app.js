@@ -20,13 +20,19 @@ let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 
+// OBLICZANIE POZOSTAŁEJ ILOŚCI
+const getRem = (name, total, res) => {
+    let reserved = 0;
+    res.forEach(r => {
+        const item = r.items.find(i => i.name === name);
+        if (item) reserved += item.qty;
+    });
+    return Math.max(0, total - reserved);
+};
+
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-item-form glass-card-dark';
-    
-    // Ustawienie domyślnego kroku (jeśli brak danych, domyślnie 1 dla szt, 0.25 dla reszty)
-    const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
-
     div.innerHTML = `
         <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
         <div class="row">
@@ -40,38 +46,29 @@ const createProductFields = (data = {}) => {
             </div>
         </div>
         <div class="row">
-            <div class="input-group"><label>Dostępna ilość (łącznie)</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+            <div class="input-group"><label>Łączna ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
             <div class="input-group">
-                <label>Krok/Podział (0.25 do 1.0)</label>
-                <input type="number" class="p-step" min="0.25" max="1" step="0.25" value="${initialStep}" required>
+                <label>Krok/Podział</label>
+                <select class="p-step">
+                    <option value="0.25" ${data.step==0.25?'selected':''}>0.25</option>
+                    <option value="0.5" ${data.step==0.5?'selected':''}>0.5</option>
+                    <option value="0.75" ${data.step==0.75?'selected':''}>0.75</option>
+                    <option value="1" ${(!data.step || data.step==1)?'selected':''}>1.0</option>
+                </select>
             </div>
         </div>
-        <div class="photo-section">
-            <input type="checkbox" class="p-no-img" id="noImg-${Math.random()}" ${data.noImg?'checked':''}> 
-            <label for="noImg-${Math.random()}">Brak zdjęcia</label>
+        <div class="photo-row">
+            <input type="checkbox" class="p-no-img" id="chk-${Math.random()}" ${data.noImg?'checked':''}> 
+            <label for="chk-${Math.random()}">Brak zdjęcia</label>
             <input type="file" class="p-file" style="${data.noImg?'display:none':''}">
         </div>
     `;
-
-    const unitSelect = div.querySelector('.p-unit');
-    const stepInput = div.querySelector('.p-step');
-    const fileInput = div.querySelector('.p-file');
-    const noImgCheck = div.querySelector('.p-no-img');
-
-    unitSelect.onchange = (e) => {
-        stepInput.value = (e.target.value === 'szt') ? 1 : 0.25;
-    };
-
-    noImgCheck.onchange = (e) => {
-        fileInput.style.display = e.target.checked ? 'none' : 'block';
-    };
-
+    div.querySelector('.p-no-img').onchange = (e) => div.querySelector('.p-file').style.display = e.target.checked ? 'none' : 'block';
     return div;
 };
 
 document.getElementById('open-add-listing-btn').onclick = () => {
     isEditing = false; document.getElementById('modal-title').innerText = "Nowa oferta";
-    document.getElementById('listing-form').reset();
     document.getElementById('products-to-add').innerHTML = '';
     document.getElementById('products-to-add').appendChild(createProductFields());
     document.getElementById('add-listing-modal').classList.remove('hidden');
@@ -119,10 +116,21 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
             <div class="listing-header"><h3>Sprzedawca: ${d.sellerName}</h3><p>📍 ${d.address} | ⏰ ${d.pickupTimes}</p></div>
-            ${d.items.map(it => `<div class="product-item-list">${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} <div><b>${it.name}</b><br><small>${it.price} zł / ${it.unit} (skok: ${it.step})</small></div></div>`).join('')}
-            <div style="padding:20px; display:flex; gap:10px">
-                <button class="btn-primary" onclick="openOrderModal('${id}')">🛒 Zamów</button>
-                <button class="btn-secondary" onclick="authSeller('${id}', '${d.pin}')">⚙️ Panel</button>
+            ${d.items.map(it => {
+                const rem = getRem(it.name, it.totalQty, d.reservations);
+                return `
+                <div class="product-item-list">
+                    ${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} 
+                    <div style="flex:1">
+                        <b>${it.name}</b><br>
+                        <small style="color:#64748b">Cena: ${it.price} zł / ${it.unit} | Min: ${it.step}</small><br>
+                        <small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${rem} ${it.unit}</small>
+                    </div>
+                </div>`;
+            }).join('')}
+            <div class="card-footer">
+                <button class="btn-primary" onclick="openOrderModal('${id}')">🛒 Zamów / Zmień</button>
+                <button class="btn-manage" onclick="authSeller('${id}', '${d.pin}')">⚙️ Panel</button>
             </div>
         `;
         cont.appendChild(card);
@@ -152,26 +160,37 @@ window.openOrderModal = async (id, editIdx = null) => {
 };
 
 window.updateSum = () => {
-    let total = 0; 
-    document.querySelectorAll('.order-qty').forEach(input => {
-        const qty = parseFloat(input.value || 0);
-        const price = parseFloat(input.dataset.price);
-        total += qty * price;
-    });
+    let total = 0; document.querySelectorAll('.order-qty').forEach(i => total += parseFloat(i.value || 0) * parseFloat(i.dataset.price));
     document.getElementById('modal-total-price').innerText = (Math.round(total * 100) / 100).toFixed(2);
 };
 
 document.getElementById('confirm-booking-btn').onclick = async () => {
-    const buyerName = document.getElementById('buyerName').value; const time = document.getElementById('buyerPickupTime').value;
-    const items = []; document.querySelectorAll('.order-qty').forEach((input, idx) => {
+    const buyerName = document.getElementById('buyerName').value.trim(); 
+    const time = document.getElementById('buyerPickupTime').value;
+    const items = []; 
+    document.querySelectorAll('.order-qty').forEach((input, idx) => {
         const q = parseFloat(input.value);
         if(q > 0) items.push({ name: document.querySelectorAll('.product-item-list span')[idx].innerText, qty: q });
     });
+
     if(!buyerName || items.length === 0) return alert("Podaj imię i wybierz produkty!");
-    const refListing = doc(db, "listings", currentEditId); const snap = await getDoc(refListing);
+
+    const refListing = doc(db, "listings", currentEditId); 
+    const snap = await getDoc(refListing);
     let res = snap.data().reservations;
-    if(editingResIndex !== null) res[editingResIndex] = { buyerName, time, items };
-    else res.push({ buyerName, time, items });
+
+    // LOGIKA ZMIANY ZAMÓWIENIA
+    const existingIndex = res.findIndex(r => r.buyerName.toLowerCase() === buyerName.toLowerCase());
+    
+    if (existingIndex !== -1 && editingResIndex === null) {
+        if (!confirm(`Sąsiedzie! Znalazłem już Twoje zamówienie (${buyerName}). Czy chcesz je nadpisać nowymi danymi?`)) return;
+        res[existingIndex] = { buyerName, time, items };
+    } else if (editingResIndex !== null) {
+        res[editingResIndex] = { buyerName, time, items };
+    } else {
+        res.push({ buyerName, time, items });
+    }
+
     await updateDoc(refListing, { reservations: res }); location.reload();
 };
 
@@ -209,7 +228,7 @@ const renderSellerView = (type) => {
                 return '';
             }).join('');
             const group = document.createElement('div'); group.className = 'res-group';
-            group.innerHTML = `<div class="res-group-title">📦 ${product.name}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">Sprzedano łącznie: ${tSold} ${product.unit}</div>${bRows || 'Brak zamówień'}<div class="res-total">Suma sprzedaży: ${pGrand.toFixed(2)} zł</div>`;
+            group.innerHTML = `<div class="res-group-title">📦 ${product.name}</div><div style="font-size:0.8rem; margin-bottom:8px; opacity:0.8">Sprzedano łącznie: ${tSold} ${product.unit} / ${product.totalQty}</div>${bRows || 'Brak zamówień'}<div class="res-total">Wartość sprzedaży: ${pGrand.toFixed(2)} zł</div>`;
             container.appendChild(group);
         });
     }

@@ -60,19 +60,19 @@
 
     <div id="reservation-modal" class="modal hidden">
         <div class="modal-content modal-solid">
-            <h3 id="res-modal-title">Złóż zamówienie</h3>
+            <h3 id="res-modal-title">Twoje zamówienie</h3>
             <div id="modal-order-items"></div>
             <div class="total-summary">Razem: <span id="modal-total-price">0.00</span> zł</div>
             <div class="input-group">
                 <label>Twoje imię:</label>
-                <input type="text" id="buyerName" required>
+                <input type="text" id="buyerName" placeholder="Wpisz imię, by złożyć lub zmienić zamówienie" required>
             </div>
             <div class="input-group">
                 <label>Kiedy odbierzesz?</label>
                 <input type="text" id="buyerPickupTime" required>
             </div>
             <div class="modal-buttons">
-                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam</button>
+                <button id="confirm-booking-btn" class="btn-primary">Zatwierdź zamówienie</button>
                 <button onclick="closeModals()" class="btn-cancel">Anuluj</button>
             </div>
         </div>
