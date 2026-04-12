@@ -15,135 +15,157 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-const form = document.getElementById('listing-form');
-const container = document.getElementById('listings-container');
-let currentProductId = null;
-let currentProductData = null;
-let lastPickupText = "";
+// DODAWANIE KOLEJNYCH PÓL PRODUKTU W FORMULARZU
+document.getElementById('add-more-items').onclick = () => {
+    const container = document.getElementById('products-to-add');
+    const newItem = container.firstElementChild.cloneNode(true);
+    newItem.querySelectorAll('input').forEach(i => i.value = '');
+    container.appendChild(newItem);
+};
 
-// DODAWANIE OGŁOSZENIA
-form.addEventListener('submit', async (e) => {
+// FORMULARZ PUBLIKACJI
+document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
-    const imageInput = document.getElementById('productImage');
-    if (!imageInput.files[0]) return alert("Wybierz zdjęcie!");
     btn.disabled = true; btn.innerText = "Publikowanie...";
 
+    const productDivs = document.querySelectorAll('.product-item-form');
+    const items = Array.from(productDivs).map(div => ({
+        name: div.querySelector('.p-name').value,
+        price: parseFloat(div.querySelector('.p-price').value),
+        unit: div.querySelector('.p-unit').value,
+        totalQty: parseFloat(div.querySelector('.p-total').value),
+        step: parseFloat(div.querySelector('.p-step').value)
+    }));
+
     try {
-        const file = imageInput.files[0];
-        const imageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(imageRef, file);
-        const imageUrl = await getDownloadURL(snapshot.ref);
+        const imageFile = document.getElementById('productImage').files[0];
+        const imageRef = ref(storage, `listings/${Date.now()}_${imageFile.name}`);
+        await uploadBytes(imageRef, imageFile);
+        const imageUrl = await getDownloadURL(imageRef);
 
         await addDoc(collection(db, "listings"), {
-            title: document.getElementById('title').value,
-            price: document.getElementById('price').value,
-            unit: document.getElementById('unit').value,
-            pickupTimes: document.getElementById('pickupTimes').value,
-            description: document.getElementById('description').value,
+            title: document.getElementById('listing-title').value,
             sellerName: document.getElementById('sellerName').value,
+            pickupTimes: document.getElementById('pickupTimes').value,
             pin: document.getElementById('pin').value,
-            imageUrl: imageUrl,
+            imageUrl,
+            items,
             reservations: [],
             createdAt: new Date()
         });
-        form.reset();
-        alert("Dodano ogłoszenie!");
-    } catch (err) { console.error(err); alert("Błąd!"); }
-    finally { btn.disabled = false; btn.innerText = "Opublikuj ogłoszenie"; }
-});
+        location.reload();
+    } catch (err) { alert("Błąd!"); console.error(err); }
+};
 
-// WYŚWIETLANIE LISTY
+// WYŚWIETLANIE OGŁOSZEŃ
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
-    container.innerHTML = '';
-    snap.forEach(documentSnapshot => {
-        const item = documentSnapshot.data();
-        const id = documentSnapshot.id;
+    const list = document.getElementById('listings-container');
+    list.innerHTML = '';
+    snap.forEach(docSnap => {
+        const d = docSnap.data();
+        const id = docSnap.id;
+        
+        let itemsHtml = d.items.map(it => `
+            <div class="item-row">
+                <span><b>${it.name}</b> (${it.totalQty} ${it.unit})</span>
+                <span>${it.price} zł / ${it.unit}</span>
+            </div>
+        `).join('');
+
         const card = document.createElement('div');
         card.className = 'product-card';
-
         card.innerHTML = `
-            <img src="${item.imageUrl}" class="product-image">
+            <img src="${d.imageUrl}" class="product-image">
             <div class="product-info">
-                <div class="product-price">${item.price} zł / ${item.unit}</div>
-                <h3>${item.title}</h3>
-                <p>${item.description}</p>
-                <div class="pickup-tag">🏠 Sprzedawca: ${item.sellerName}<br>⏰ Można odbierać: ${item.pickupTimes}</div>
-                <button class="btn-reserve" onclick="openBooking('${id}', '${item.title}', '${item.sellerName}')">Zarezerwuj</button>
-                <button class="btn-seller-preview" onclick="authSeller('${id}', '${item.pin}', '${item.title}', ${JSON.stringify(item.reservations).replace(/"/g, '&quot;')})">⚙️ Panel sprzedawcy</button>
+                <h3>${d.title}</h3>
+                <div class="pickup-tag">👤 ${d.sellerName} | ⏰ ${d.pickupTimes}</div>
+                <div class="items-list">${itemsHtml}</div>
+                <button class="btn-primary" onclick="openOrderModal('${id}')" style="margin-top:15px">Zarezerwuj wybrane</button>
+                <button class="btn-secondary" onclick="authSeller('${id}', '${d.pin}')">⚙️ Zarządzaj</button>
             </div>
         `;
-        container.appendChild(card);
+        list.appendChild(card);
     });
 });
 
-// MODAL REZERWACJI (KUPUJĄCY)
-window.openBooking = (id, title, seller) => {
-    currentProductId = id;
-    currentProductData = { title, seller };
-    document.getElementById('modal-product-info').innerText = `${title} od ${seller}`;
-    document.getElementById('reservation-modal').classList.remove('hidden');
+// LOGIKA MODALU ZAMÓWIENIA
+let currentListingId = null;
+let orderData = {};
+
+window.openOrderModal = (id) => {
+    currentListingId = id;
+    onSnapshot(doc(db, "listings", id), (snap) => {
+        const d = snap.data();
+        const container = document.getElementById('modal-order-items');
+        container.innerHTML = '';
+        orderData = {};
+
+        d.items.forEach((it, index) => {
+            orderData[index] = { qty: 0, price: it.price, step: it.step, name: it.name, unit: it.unit };
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.innerHTML = `
+                <span>${it.name}</span>
+                <div class="qty-control">
+                    <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                    <span class="qty-val" id="qty-${index}">0 ${it.unit}</span>
+                    <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+        document.getElementById('reservation-modal').classList.remove('hidden');
+    });
 };
 
-// PANEL SPRZEDAWCY (PO PINIE)
-window.authSeller = (id, correctPin, title, reservations) => {
-    const userPin = prompt("Podaj PIN Twojego ogłoszenia:");
-    if (userPin === correctPin) {
-        currentProductId = id;
-        document.getElementById('seller-modal-product-title').innerText = title;
-        const resContainer = document.getElementById('reservations-container');
-        
-        if (!reservations || reservations.length === 0) {
-            resContainer.innerHTML = "<p style='font-size:0.8rem; opacity:0.7;'>Brak rezerwacji.</p>";
-        } else {
-            resContainer.innerHTML = "<h4>Zamówienia od sąsiadów:</h4>";
-            reservations.forEach(r => {
-                resContainer.innerHTML += `<div class="res-item-row">👤 <b>${r.name}</b><br>🕒 Zadeklarowany czas: ${r.time}</div>`;
-            });
-        }
-        document.getElementById('seller-modal').classList.remove('hidden');
-    } else {
-        alert("Błędny PIN!");
-    }
+window.updateQty = (index, direction) => {
+    const it = orderData[index];
+    const newVal = Math.max(0, it.qty + (direction * it.step));
+    it.qty = newVal;
+    document.getElementById(`qty-${index}`).innerText = `${newVal.toFixed(2)} ${it.unit}`;
+    
+    let total = 0;
+    Object.values(orderData).forEach(o => total += o.qty * o.price);
+    document.getElementById('modal-total-price').innerText = total.toFixed(2);
 };
 
-window.closeModals = () => {
-    document.getElementById('reservation-modal').classList.add('hidden');
-    document.getElementById('seller-modal').classList.add('hidden');
-};
-
-// POTWIERDZENIE REZERWACJI
 document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerName = document.getElementById('buyerName').value;
-    const buyerTime = document.getElementById('buyerPickupTime').value;
-    if (!buyerName || !buyerTime) return alert("Wpisz swoje imię i kiedy wpadniesz!");
+    const time = document.getElementById('buyerPickupTime').value;
+    const itemsOrdered = Object.values(orderData).filter(o => o.qty > 0);
     
-    lastPickupText = buyerTime;
+    if(!buyerName || itemsOrdered.length === 0) return alert("Wybierz produkty i podaj imię!");
 
-    try {
-        await updateDoc(doc(db, "listings", currentProductId), {
-            reservations: arrayUnion({ name: buyerName, time: buyerTime })
-        });
-        document.getElementById('reservation-modal').classList.add('hidden');
-        document.getElementById('success-modal').classList.remove('hidden');
-    } catch (err) { alert("Błąd rezerwacji!"); }
+    await updateDoc(doc(db, "listings", currentListingId), {
+        reservations: arrayUnion({ buyerName, time, items: itemsOrdered })
+    });
+    location.reload();
 };
 
-// USUWANIE
+// PANEL SPRZEDAWCY
+window.authSeller = (id, pin) => {
+    if(prompt("Podaj PIN:") !== pin) return alert("Błędny PIN");
+    currentListingId = id;
+    onSnapshot(doc(db, "listings", id), (snap) => {
+        const d = snap.data();
+        const resCont = document.getElementById('reservations-container');
+        resCont.innerHTML = `<h4>Zamówienia dla: ${d.title}</h4>`;
+        d.reservations.forEach(r => {
+            const itemsStr = r.items.map(i => `${i.qty}${i.unit} ${i.name}`).join(', ');
+            resCont.innerHTML += `<div class="res-item-row" style="color:white; border-bottom:1px solid #555; padding:10px 0">
+                <b>${r.buyerName}</b>: ${itemsStr}<br><small>Odbiór: ${r.time}</small>
+            </div>`;
+        });
+        document.getElementById('seller-modal').classList.remove('hidden');
+    });
+};
+
 document.getElementById('delete-listing-btn').onclick = async () => {
-    if (confirm("Czy na pewno chcesz usunąć to ogłoszenie?")) {
-        await deleteDoc(doc(db, "listings", currentProductId));
-        closeModals();
+    if(confirm("Usunąć ogłoszenie?")) {
+        await deleteDoc(doc(db, "listings", currentListingId));
+        location.reload();
     }
 };
 
-// KALENDARZ GOOGLE
-document.getElementById('add-to-calendar-btn').onclick = () => {
-    const now = new Date();
-    const start = now.toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const end = new Date(now.getTime() + 3600000).toISOString().replace(/-|:|\.\d\d\d/g, "");
-    
-    const details = `Odbiór od: ${currentProductData.seller}. Twój opis czasu: ${lastPickupText}`;
-    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Odbiór: ' + currentProductData.title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&sf=true&output=xml`;
-    window.open(url, '_blank');
-};
+window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));

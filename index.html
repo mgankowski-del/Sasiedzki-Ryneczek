@@ -15,37 +15,53 @@
 
         <main>
             <section id="add-listing" class="glass-card">
-                <h2>Dodaj nowe ogłoszenie</h2>
+                <h2>Opublikuj ofertę</h2>
                 <form id="listing-form">
                     <div class="input-group">
-                        <label>Co oferujesz?</label>
-                        <input type="text" id="title" placeholder="np. Chleb Rysia" required>
+                        <label>Tytuł ogłoszenia (np. Sobotni koszyk Rysia)</label>
+                        <input type="text" id="listing-title" placeholder="Wspólna nazwa dla Twoich produktów" required>
+                    </div>
+
+                    <div id="products-to-add">
+                        <div class="product-item-form glass-card-dark">
+                            <div class="input-group">
+                                <label>Nazwa produktu</label>
+                                <input type="text" class="p-name" placeholder="np. Chleb żytni" required>
+                            </div>
+                            <div class="row">
+                                <div class="input-group">
+                                    <label>Cena za jednostkę (zł)</label>
+                                    <input type="number" class="p-price" step="0.01" placeholder="20.00" required>
+                                </div>
+                                <div class="input-group">
+                                    <label>Jednostka</label>
+                                    <input type="text" class="p-unit" placeholder="kg lub szt" required>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="input-group">
+                                    <label>Łączna ilość</label>
+                                    <input type="number" class="p-total" step="0.01" placeholder="5" required>
+                                </div>
+                                <div class="input-group">
+                                    <label>Min. zamówienie (krok)</label>
+                                    <input type="number" class="p-step" step="0.01" placeholder="0.25" required>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="row">
-                        <div class="input-group">
-                            <label>Cena (zł)</label>
-                            <input type="number" id="price" step="0.01" required>
-                        </div>
-                        <div class="input-group">
-                            <label>Jednostka</label>
-                            <input type="text" id="unit" placeholder="szt, kg, słoik" required>
-                        </div>
-                    </div>
+                    <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt do tego ogłoszenia</button>
 
+                    <hr>
                     <div class="input-group">
-                        <label>Kiedy sąsiedzi mogą odbierać?</label>
-                        <input type="text" id="pickupTimes" placeholder="np. Codziennie po 18:00, weekendy rano" required>
-                    </div>
-
-                    <div class="input-group">
-                        <label>Opis i składniki</label>
-                        <textarea id="description" placeholder="Opisz produkt i alergeny..." required></textarea>
+                        <label>Kiedy można odbierać?</label>
+                        <input type="text" id="pickupTimes" placeholder="np. Sobota rano" required>
                     </div>
 
                     <div class="input-group">
                         <label class="file-label">
-                            <span>📷 Dodaj zdjęcie</span>
+                            <span>📷 Dodaj zdjęcie zbiorcze</span>
                             <input type="file" id="productImage" required>
                         </label>
                     </div>
@@ -56,42 +72,40 @@
                             <input type="text" id="sellerName" placeholder="Kasia" required>
                         </div>
                         <div class="input-group">
-                            <label>PIN (do panelu sprzedawcy)</label>
-                            <input type="password" id="pin" maxlength="4" placeholder="4 cyfry" required>
+                            <label>PIN (4 cyfry)</label>
+                            <input type="password" id="pin" maxlength="4" required>
                         </div>
                     </div>
 
-                    <button type="submit" id="submitBtn">Opublikuj ogłoszenie</button>
+                    <button type="submit" id="submitBtn">Opublikuj listę produktów</button>
                 </form>
             </section>
 
             <section id="listings">
-                <h2>Aktualne ogłoszenia</h2>
-                <div id="listings-container">
-                    <p class="loading">Ładowanie...</p>
-                </div>
+                <h2>Aktualne oferty</h2>
+                <div id="listings-container"></div>
             </section>
         </main>
-
-        <footer>
-            <p>&copy; 2026 Sąsiedzki Ryneczek</p>
-        </footer>
     </div>
 
     <div id="reservation-modal" class="modal hidden">
         <div class="modal-content glass-card">
-            <h3>Zarezerwuj produkt</h3>
-            <p id="modal-product-info"></p>
+            <h3>Złóż zamówienie</h3>
+            <div id="modal-order-items"></div> <div class="total-summary glass-card-dark">
+                Suma: <span id="modal-total-price">0.00</span> zł
+            </div>
+
             <div class="input-group">
                 <label>Twoje imię:</label>
-                <input type="text" id="buyerName" placeholder="Np. Marek z 4 piętra" required>
+                <input type="text" id="buyerName" required>
             </div>
             <div class="input-group">
-                <label>Kiedy odbierzesz?</label>
-                <input type="text" id="buyerPickupTime" placeholder="np. Dzisiaj po 19:00, jutro rano" required>
+                <label>Kiedy wpadniesz?</label>
+                <input type="text" id="buyerPickupTime" placeholder="np. Dziś po 18" required>
             </div>
+            
             <div class="modal-buttons">
-                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam rezerwację</button>
+                <button id="confirm-booking-btn" class="btn-primary">Zamawiam i rezerwuję</button>
                 <button onclick="closeModals()" class="btn-secondary">Anuluj</button>
             </div>
         </div>
@@ -99,22 +113,10 @@
 
     <div id="seller-modal" class="modal hidden">
         <div class="modal-content glass-card seller-view">
-            <h3>Panel Sprzedawcy</h3>
-            <p id="seller-modal-product-title" style="font-weight: bold;"></p>
+            <h3>Panel Zarządzania</h3>
             <div id="reservations-container" class="reservations-panel"></div>
-            <div class="modal-buttons" style="flex-direction: column;">
-                <button id="delete-listing-btn" class="btn-delete">Usuń to ogłoszenie</button>
-                <button onclick="closeModals()" class="btn-secondary">Zamknij</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="success-modal" class="modal hidden">
-        <div class="modal-content glass-card">
-            <h2>🎉 Zapisano rezerwację!</h2>
-            <p>Sprzedawca widzi Twój komentarz. Możesz dodać przypomnienie do kalendarza:</p>
-            <button id="add-to-calendar-btn" class="btn-calendar">📅 Dodaj do Kalendarza Google</button>
-            <button onclick="location.reload()" class="btn-secondary">Zamknij</button>
+            <button id="delete-listing-btn" class="btn-delete">Usuń całe ogłoszenie</button>
+            <button onclick="closeModals()" class="btn-secondary">Zamknij</button>
         </div>
     </div>
 
