@@ -64,15 +64,15 @@ button {
     margin-top: 10px; width: 100%; padding: 8px;
 }
 
-/* PANEL ZAMÓWIEŃ W MODALU */
+/* PANEL SPRZEDAWCY */
 .reservations-panel {
     background: rgba(255,255,255,0.1);
     border-radius: 15px; padding: 15px; margin: 15px 0;
-    max-height: 200px; overflow-y: auto; text-align: left;
+    max-height: 250px; overflow-y: auto; text-align: left;
 }
 .res-item-row {
-    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
-    font-size: 0.9rem;
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 0.95rem; line-height: 1.4;
 }
 .res-item-row:last-child { border-bottom: none; }
 

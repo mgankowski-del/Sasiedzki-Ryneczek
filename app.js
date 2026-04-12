@@ -19,6 +19,7 @@ const form = document.getElementById('listing-form');
 const container = document.getElementById('listings-container');
 let currentProductId = null;
 let currentProductData = null;
+let lastPickupText = "";
 
 // DODAWANIE OGŁOSZENIA
 form.addEventListener('submit', async (e) => {
@@ -47,12 +48,12 @@ form.addEventListener('submit', async (e) => {
             createdAt: new Date()
         });
         form.reset();
-        alert("Dodano!");
+        alert("Dodano ogłoszenie!");
     } catch (err) { console.error(err); alert("Błąd!"); }
     finally { btn.disabled = false; btn.innerText = "Opublikuj ogłoszenie"; }
 });
 
-// WYŚWIETLANIE LISTY (Z PRZYCISKIEM PODGLĄDU)
+// WYŚWIETLANIE LISTY
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     container.innerHTML = '';
     snap.forEach(documentSnapshot => {
@@ -67,16 +68,24 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
                 <div class="product-price">${item.price} zł / ${item.unit}</div>
                 <h3>${item.title}</h3>
                 <p>${item.description}</p>
-                <div class="pickup-tag">🏠 Sprzedawca: ${item.sellerName}<br>⏰ Odbiór: ${item.pickupTimes}</div>
+                <div class="pickup-tag">🏠 Sprzedawca: ${item.sellerName}<br>⏰ Można odbierać: ${item.pickupTimes}</div>
                 <button class="btn-reserve" onclick="openBooking('${id}', '${item.title}', '${item.sellerName}')">Zarezerwuj</button>
-                <button class="btn-seller-preview" onclick="authSeller('${id}', '${item.pin}', '${item.title}', ${JSON.stringify(item.reservations).replace(/"/g, '&quot;')})">⚙️ Podgląd sprzedającego</button>
+                <button class="btn-seller-preview" onclick="authSeller('${id}', '${item.pin}', '${item.title}', ${JSON.stringify(item.reservations).replace(/"/g, '&quot;')})">⚙️ Panel sprzedawcy</button>
             </div>
         `;
         container.appendChild(card);
     });
 });
 
-// WERYFIKACJA PINU I OTWARCIE PANELU
+// MODAL REZERWACJI (KUPUJĄCY)
+window.openBooking = (id, title, seller) => {
+    currentProductId = id;
+    currentProductData = { title, seller };
+    document.getElementById('modal-product-info').innerText = `${title} od ${seller}`;
+    document.getElementById('reservation-modal').classList.remove('hidden');
+};
+
+// PANEL SPRZEDAWCY (PO PINIE)
 window.authSeller = (id, correctPin, title, reservations) => {
     const userPin = prompt("Podaj PIN Twojego ogłoszenia:");
     if (userPin === correctPin) {
@@ -87,33 +96,15 @@ window.authSeller = (id, correctPin, title, reservations) => {
         if (!reservations || reservations.length === 0) {
             resContainer.innerHTML = "<p style='font-size:0.8rem; opacity:0.7;'>Brak rezerwacji.</p>";
         } else {
-            resContainer.innerHTML = "<h4>Zamówienia:</h4>";
+            resContainer.innerHTML = "<h4>Zamówienia od sąsiadów:</h4>";
             reservations.forEach(r => {
-                resContainer.innerHTML += `<div class="res-item-row">👤 ${r.name}<br><small>⏰ ${r.time.replace('T', ' ')}</small></div>`;
+                resContainer.innerHTML += `<div class="res-item-row">👤 <b>${r.name}</b><br>🕒 Zadeklarowany czas: ${r.time}</div>`;
             });
         }
-        
         document.getElementById('seller-modal').classList.remove('hidden');
     } else {
         alert("Błędny PIN!");
     }
-};
-
-// USUWANIE
-document.getElementById('delete-listing-btn').onclick = async () => {
-    if (confirm("Czy na pewno chcesz usunąć to ogłoszenie i wszystkie zamówienia?")) {
-        await deleteDoc(doc(db, "listings", currentProductId));
-        closeModals();
-        alert("Ogłoszenie usunięte.");
-    }
-};
-
-// RESZTA FUNKCJI (REZERWACJA, KALENDARZ)
-window.openBooking = (id, title, seller) => {
-    currentProductId = id;
-    currentProductData = { title, seller };
-    document.getElementById('modal-product-info').innerText = `${title} od ${seller}`;
-    document.getElementById('reservation-modal').classList.remove('hidden');
 };
 
 window.closeModals = () => {
@@ -121,11 +112,14 @@ window.closeModals = () => {
     document.getElementById('seller-modal').classList.add('hidden');
 };
 
+// POTWIERDZENIE REZERWACJI
 document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerName = document.getElementById('buyerName').value;
     const buyerTime = document.getElementById('buyerPickupTime').value;
-    if (!buyerName || !buyerTime) return alert("Wypełnij dane!");
+    if (!buyerName || !buyerTime) return alert("Wpisz swoje imię i kiedy wpadniesz!");
     
+    lastPickupText = buyerTime; // Zapamiętujemy tekst dla kalendarza
+
     try {
         await updateDoc(doc(db, "listings", currentProductId), {
             reservations: arrayUnion({ name: buyerName, time: buyerTime })
@@ -135,10 +129,22 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     } catch (err) { alert("Błąd rezerwacji!"); }
 };
 
+// USUWANIE
+document.getElementById('delete-listing-btn').onclick = async () => {
+    if (confirm("Czy na pewno chcesz usunąć to ogłoszenie?")) {
+        await deleteDoc(doc(db, "listings", currentProductId));
+        closeModals();
+    }
+};
+
+// KALENDARZ GOOGLE (Z TEKSTEM OPISOWYM)
 document.getElementById('add-to-calendar-btn').onclick = () => {
-    const time = document.getElementById('buyerPickupTime').value;
-    const start = new Date(time).toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const end = new Date(new Date(time).getTime() + 1800000).toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Odbiór: ' + currentProductData.title)}&dates=${start}/${end}&details=${encodeURIComponent('U: ' + currentProductData.seller)}&sf=true&output=xml`;
+    const now = new Date();
+    const start = now.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    const end = new Date(now.getTime() + 3600000).toISOString().replace(/-|:|\.\d\d\d/g, "");
+    
+    // Dodajemy opisowy czas do szczegółów wydarzenia
+    const details = `Odbiór od: ${currentProductData.seller}. Twój zadeklarowany czas: ${lastPickupText}`;
+    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Odbiór: ' + currentProductData.title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&sf=true&output=xml`;
     window.open(url, '_blank');
 };
