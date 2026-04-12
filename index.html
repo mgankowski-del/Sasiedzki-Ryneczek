@@ -10,14 +10,16 @@
     <div class="container">
         <header>
             <h1>Sąsiedzki Ryneczek</h1>
-            <p class="subtitle">Produkty prosto od sąsiadów</p>
-            <button id="open-add-listing-btn" class="btn-add-main">➕ Opublikuj nową ofertę</button>
+            <p class="subtitle">Produkty prosto od Twoich sąsiadów</p>
+            <div class="header-action">
+                <button id="open-add-listing-btn" class="btn-add-main">➕ Opublikuj nową ofertę</button>
+            </div>
         </header>
 
         <main>
             <section id="listings">
                 <div id="listings-container">
-                    <p class="loading">Ładowanie produktów...</p>
+                    <p class="loading">Czekaj, szukamy świeżych produktów...</p>
                 </div>
             </section>
         </main>
@@ -39,18 +41,19 @@
                 </div>
                 <div class="input-group">
                     <label>Możliwe godziny odbioru</label>
-                    <input type="text" id="pickupTimes" class="wide-input" placeholder="Np. pon 10-14, sobota rano" required>
+                    <input type="text" id="pickupTimes" class="wide-input" placeholder="Np. Pon-Pt 17:00-20:00" required>
                 </div>
-                <hr>
+                <hr class="divider">
                 <div id="products-to-add"></div>
-                <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt</button>
+                <button type="button" id="add-more-items" class="btn-secondary-outline">+ Dodaj kolejny produkt</button>
+                
                 <div class="row" style="margin-top: 20px;">
                     <div class="input-group">
                         <label>PIN ogłoszenia (widoczny)</label>
                         <input type="text" id="pin" maxlength="4" placeholder="4 cyfry" required>
                     </div>
                 </div>
-                <button type="submit" id="submitBtn" class="btn-primary">Zapisz i Opublikuj</button>
+                <button type="submit" id="submitBtn" class="btn-primary-action">Zapisz i Opublikuj</button>
                 <button type="button" onclick="closeModals()" class="btn-cancel">Anuluj</button>
             </form>
         </div>
@@ -59,9 +62,13 @@
     <div id="reservation-modal" class="modal hidden">
         <div class="modal-content modal-solid">
             <h3 id="res-modal-title">Twoje zamówienie</h3>
-            <p id="buyer-status-msg" class="info-text">💡 Podaj imię i PIN, by złożyć zamówienie.</p>
+            <p id="buyer-status-msg" class="info-text">💡 Podaj imię i PIN, by złożyć lub zmienić zamówienie.</p>
             <div id="modal-order-items"></div>
-            <div class="total-summary">Razem: <span id="modal-total-price">0.00</span> zł</div>
+            <div class="total-summary-box">
+                <span>Razem do zapłaty:</span>
+                <span id="modal-total-price">0.00</span> zł
+            </div>
+            
             <div class="row">
                 <div class="input-group">
                     <label>Twoje imię:</label>
@@ -74,10 +81,11 @@
             </div>
             <div class="input-group">
                 <label>Kiedy odbierzesz?</label>
-                <input type="text" id="buyerPickupTime" placeholder="Np. Dzisiaj wieczorem" required>
+                <input type="text" id="buyerPickupTime" placeholder="Np. Dzisiaj po 18:00" required>
             </div>
+            
             <div class="modal-buttons">
-                <button id="confirm-booking-btn" class="btn-primary">Zatwierdź zamówienie</button>
+                <button id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
                 <button onclick="closeModals()" class="btn-cancel">Anuluj</button>
             </div>
         </div>
@@ -85,21 +93,18 @@
 
     <div id="seller-modal" class="modal hidden">
         <div class="modal-content modal-solid scrollable-modal">
-            <div class="modal-header">
+            <div class="modal-header-nav">
                 <h3>Panel Zarządzania</h3>
                 <div class="view-switcher">
-                    <button id="view-by-person" class="tab-btn active">👤 Wg osób</button>
-                    <button id="view-by-product" class="tab-btn">📦 Wg produktów</button>
+                    <button id="view-by-person" class="tab-btn active">👤 Osoby</button>
+                    <button id="view-by-product" class="tab-btn">📦 Produkty</button>
                 </div>
             </div>
-
-            <div id="reservations-container" class="reservations-list-container">
-                </div>
-
-            <div class="admin-actions">
-                <button id="edit-listing-btn" class="btn-edit-main">✏️ Modyfikuj ogłoszenie</button>
-                <button id="delete-listing-btn" class="btn-delete-main">🗑️ Usuń całą ofertę</button>
-                <button onclick="closeModals()" class="btn-close-outline">Zamknij panel</button>
+            <div id="reservations-container" class="reservations-list-ui"></div>
+            <div class="admin-footer">
+                <button id="edit-listing-btn" class="btn-edit-full">✏️ Modyfikuj ogłoszenie</button>
+                <button id="delete-listing-btn" class="btn-delete-full">🗑️ Usuń ofertę</button>
+                <button onclick="closeModals()" class="btn-close-panel">Zamknij</button>
             </div>
         </div>
     </div>
