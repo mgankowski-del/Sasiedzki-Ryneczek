@@ -10,15 +10,14 @@
     <div class="container">
         <header>
             <h1>Sąsiedzki Ryneczek</h1>
-            <p class="subtitle">Domowe produkty od Twoich sąsiadów</p>
-            <button id="open-add-listing-btn" class="btn-add-main">➕ Dodaj swoje ogłoszenie</button>
+            <p class="subtitle">Produkty prosto od sąsiadów</p>
+            <button id="open-add-listing-btn" class="btn-add-main">➕ Opublikuj nową ofertę</button>
         </header>
 
         <main>
             <section id="listings">
-                <h2>Aktualne pyszności</h2>
                 <div id="listings-container">
-                    <p class="loading">Ładowanie...</p>
+                    <p class="loading">Ładowanie świeżych produktów...</p>
                 </div>
             </section>
         </main>
@@ -30,68 +29,38 @@
 
     <div id="add-listing-modal" class="modal hidden">
         <div class="modal-content modal-solid scrollable-modal">
-            <h2>Nowa oferta</h2>
+            <h2 id="modal-title">Nowa oferta</h2>
             <form id="listing-form">
-                <div class="input-group">
-                    <label>Tytuł ogłoszenia</label>
-                    <input type="text" id="listing-title" placeholder="np. Domowe Wypieki" required>
-                </div>
-
-                <div id="products-to-add">
-                    <div class="product-item-form glass-card-dark">
-                        <div class="input-group">
-                            <label>Nazwa produktu</label>
-                            <input type="text" class="p-name" placeholder="np. Chleb" required>
-                        </div>
-                        <div class="row">
-                            <div class="input-group">
-                                <label>Cena (zł)</label>
-                                <input type="number" class="p-price" step="0.01" required>
-                            </div>
-                            <div class="input-group">
-                                <label>Jednostka</label>
-                                <input type="text" class="p-unit" placeholder="szt" required>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="input-group">
-                                <label>Ilość</label>
-                                <input type="number" class="p-total" step="0.01" required>
-                            </div>
-                            <div class="input-group">
-                                <label>Krok</label>
-                                <input type="number" class="p-step" step="0.01" value="1" required>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt</button>
-
-                <div class="input-group" style="margin-top: 20px;">
-                    <label>Kiedy odbiór?</label>
-                    <input type="text" id="pickupTimes" placeholder="np. Sobota 10-12" required>
-                </div>
-
-                <div class="input-group">
-                    <label class="file-label">
-                        <span>📷 Zdjęcie zbiorcze</span>
-                        <input type="file" id="productImage" required>
-                    </label>
-                </div>
-
                 <div class="row">
                     <div class="input-group">
                         <label>Twoje Imię</label>
-                        <input type="text" id="sellerName" required>
+                        <input type="text" id="sellerName" placeholder="Np. Michał" required>
                     </div>
+                    <div class="input-group">
+                        <label>Adres odbioru</label>
+                        <input type="text" id="pickupAddress" placeholder="Np. ul. Polna 4/12" required>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Możliwe godziny odbioru</label>
+                    <input type="text" id="pickupTimes" class="wide-input" placeholder="Np. Pon-Pt 17:00-20:00, Soboty rano" required>
+                </div>
+
+                <hr>
+                <div id="products-to-add">
+                    </div>
+                
+                <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt</button>
+
+                <div class="row" style="margin-top: 20px;">
                     <div class="input-group">
                         <label>PIN (4 cyfry)</label>
                         <input type="password" id="pin" maxlength="4" required>
                     </div>
                 </div>
 
-                <button type="submit" id="submitBtn" class="btn-primary">Opublikuj ogłoszenie</button>
+                <button type="submit" id="submitBtn" class="btn-primary">Zapisz i Opublikuj</button>
                 <button type="button" onclick="closeModals()" class="btn-cancel">Anuluj</button>
             </form>
         </div>
@@ -99,15 +68,15 @@
 
     <div id="reservation-modal" class="modal hidden">
         <div class="modal-content modal-solid">
-            <h3>Twoje zamówienie</h3>
+            <h3 id="res-modal-title">Złóż zamówienie</h3>
             <div id="modal-order-items"></div>
-            <div class="total-summary">Suma: <span id="modal-total-price">0.00</span> zł</div>
+            <div class="total-summary">Razem: <span id="modal-total-price">0.00</span> zł</div>
             <div class="input-group">
                 <label>Twoje imię:</label>
                 <input type="text" id="buyerName" required>
             </div>
             <div class="input-group">
-                <label>Kiedy wpadniesz?</label>
+                <label>Kiedy odbierzesz?</label>
                 <input type="text" id="buyerPickupTime" required>
             </div>
             <div class="modal-buttons">
@@ -119,9 +88,13 @@
 
     <div id="seller-modal" class="modal hidden">
         <div class="modal-content modal-solid">
-            <h3>Lista rezerwacji</h3>
+            <h3>Panel Zarządzania</h3>
             <div id="reservations-container" class="reservations-panel"></div>
-            <button id="delete-listing-btn" class="btn-delete">Usuń ogłoszenie</button>
+            <div class="modal-buttons-grid">
+                <button id="download-report-btn" class="btn-report">📥 Pobierz podsumowanie (CSV)</button>
+                <button id="edit-listing-btn" class="btn-edit">✏️ Modyfikuj ogłoszenie</button>
+                <button id="delete-listing-btn" class="btn-delete">🗑️ Usuń ogłoszenie</button>
+            </div>
             <button onclick="closeModals()" class="btn-cancel">Zamknij</button>
         </div>
     </div>
