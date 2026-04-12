@@ -17,14 +17,10 @@
         <main>
             <section id="listings">
                 <div id="listings-container">
-                    <p class="loading">Ładowanie świeżych produktów...</p>
+                    <p class="loading">Ładowanie produktów...</p>
                 </div>
             </section>
         </main>
-
-        <footer>
-            <p>&copy; 2026 Sąsiedzki Ryneczek</p>
-        </footer>
     </div>
 
     <div id="add-listing-modal" class="modal hidden">
@@ -41,25 +37,19 @@
                         <input type="text" id="pickupAddress" placeholder="Np. ul. Polna 4/12" required>
                     </div>
                 </div>
-
                 <div class="input-group">
                     <label>Możliwe godziny odbioru</label>
-                    <input type="text" id="pickupTimes" class="wide-input" placeholder="Np. Pon-Pt 17:00-20:00, Soboty rano" required>
+                    <input type="text" id="pickupTimes" class="wide-input" placeholder="Np. Pon-Pt 17:00-20:00" required>
                 </div>
-
                 <hr>
-                <div id="products-to-add">
-                    </div>
-                
+                <div id="products-to-add"></div>
                 <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt</button>
-
                 <div class="row" style="margin-top: 20px;">
                     <div class="input-group">
                         <label>PIN (4 cyfry)</label>
                         <input type="password" id="pin" maxlength="4" required>
                     </div>
                 </div>
-
                 <button type="submit" id="submitBtn" class="btn-primary">Zapisz i Opublikuj</button>
                 <button type="button" onclick="closeModals()" class="btn-cancel">Anuluj</button>
             </form>
@@ -87,13 +77,16 @@
     </div>
 
     <div id="seller-modal" class="modal hidden">
-        <div class="modal-content modal-solid">
+        <div class="modal-content modal-solid scrollable-modal">
             <h3>Panel Zarządzania</h3>
+            <div class="view-switcher">
+                <button id="view-by-person" class="btn-tab active">👤 Wg osób</button>
+                <button id="view-by-product" class="btn-tab">📦 Wg produktów</button>
+            </div>
             <div id="reservations-container" class="reservations-panel"></div>
             <div class="modal-buttons-grid">
-                <button id="download-report-btn" class="btn-report">📥 Pobierz podsumowanie (CSV)</button>
-                <button id="edit-listing-btn" class="btn-edit">✏️ Modyfikuj ogłoszenie</button>
-                <button id="delete-listing-btn" class="btn-delete">🗑️ Usuń ogłoszenie</button>
+                <button id="edit-listing-btn" class="btn-edit">✏️ Modyfikuj</button>
+                <button id="delete-listing-btn" class="btn-delete">🗑️ Usuń ofertę</button>
             </div>
             <button onclick="closeModals()" class="btn-cancel">Zamknij</button>
         </div>
