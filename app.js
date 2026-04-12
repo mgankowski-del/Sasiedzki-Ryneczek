@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
-// KONFIGURACJA
 const firebaseConfig = {
     apiKey: "AIzaSyD_cuGXokb55W6W4aB-QkV0c_jAqXkJQgk",
     authDomain: "sasiedzki-ryneczek.firebaseapp.com",
@@ -20,18 +19,33 @@ let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 
-// --- FUNKCJE GLOBALNE (DOSTĘPNE Z HTML) ---
+// --- FUNKCJE GLOBALNE ---
 window.closeModals = () => {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 };
 
-// --- KREATOR PÓL PRODUKTU ---
+window.updateSum = () => {
+    let total = 0;
+    document.querySelectorAll('.order-qty-val').forEach(span => {
+        total += parseFloat(span.innerText) * parseFloat(span.dataset.price);
+    });
+    document.getElementById('modal-total-price').innerText = (Math.round(total * 100) / 100).toFixed(2);
+};
+
+// --- LOGIKA DOSTĘPNOŚCI ---
+const getRem = (name, total, res, ignoreIdx = null) => {
+    let reserved = 0;
+    res.forEach((r, idx) => { if (ignoreIdx !== null && idx === ignoreIdx) return; const item = r.items.find(i => i.name === name); if (item) reserved += parseFloat(item.qty); });
+    return Math.max(0, total - reserved);
+};
+
+// --- FORMULARZ PRODUKTÓW ---
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
-        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="Np. Jajka" required></div>
+        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
             <div class="input-group"><label>Jednostka</label>
@@ -53,53 +67,40 @@ const createProductFields = (data = {}) => {
                 </select>
             </div>
         </div>
-        <div style="margin-top:10px">
-            <label style="font-size:0.8rem; color:var(--accent)">📸 Dodaj zdjęcie (opcjonalnie)</label>
-            <input type="file" class="p-file" accept="image/*" style="border:none; background:transparent; padding:5px">
-        </div>
+        <input type="file" class="p-file" accept="image/*" style="margin-top:10px; border:none">
     `;
     return div;
 };
 
-// --- INICJALIZACJA PRZYCISKÓW (BULLETPROOF) ---
-const initApp = () => {
+// --- START APLIKACJI ---
+document.addEventListener('DOMContentLoaded', () => {
     const btnOpenAdd = document.getElementById('btn-open-add');
-    const productsCont = document.getElementById('products-to-add');
-
-    if (btnOpenAdd) {
+    if(btnOpenAdd) {
         btnOpenAdd.onclick = () => {
             document.getElementById('modal-title').innerText = "Nowa oferta";
             document.getElementById('listing-form').reset();
-            productsCont.innerHTML = '';
-            productsCont.appendChild(createProductFields());
+            document.getElementById('products-to-add').innerHTML = '';
+            document.getElementById('products-to-add').appendChild(createProductFields());
             document.getElementById('add-listing-modal').classList.remove('hidden');
         };
     }
 
-    const btnAddMore = document.getElementById('add-more-items');
-    if (btnAddMore) {
-        btnAddMore.onclick = () => {
-            productsCont.appendChild(createProductFields());
-        };
-    }
-};
+    document.getElementById('add-more-items').onclick = () => {
+        document.getElementById('products-to-add').appendChild(createProductFields());
+    };
 
-// --- FIREBASE: POBIERANIE DANYCH ---
-const getRem = (name, total, res, ignoreIdx = null) => {
-    let reserved = 0;
-    res.forEach((r, idx) => { if (ignoreIdx !== null && idx === ignoreIdx) return; const item = r.items.find(i => i.name === name); if (item) reserved += parseFloat(item.qty); });
-    return Math.max(0, total - reserved);
-};
+    // KLUCZOWY FIX: PRZYCISK ZATWIERDŹ ZAMÓWIENIE
+    document.getElementById('confirm-booking-btn').onclick = handleOrderConfirmation;
+});
 
+// --- POBIERANIE OGŁOSZEŃ ---
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
     cont.innerHTML = snap.empty ? '<p class="status-msg">Brak ofert.</p>' : '';
     snap.forEach(docSnap => {
-        const d = docSnap.data();
-        const id = docSnap.id;
-        const card = document.createElement('div');
-        card.className = 'product-card';
+        const d = docSnap.data(); const id = docSnap.id;
+        const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
             <div class="listing-header"><h3>Odbiór u: ${d.sellerName}</h3><p>📍 ${d.address} | ⏰ ${d.pickupTimes}</p></div>
             ${d.items.map(it => {
@@ -119,56 +120,11 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     });
 });
 
-// --- ZAPIS OFERTY (ZE ZDJĘCIAMI) ---
-document.getElementById('listing-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true; btn.innerText = "Wysyłanie...";
-
-    try {
-        const products = [];
-        const productDivs = document.querySelectorAll('.product-form-box');
-
-        for (const div of productDivs) {
-            const file = div.querySelector('.p-file').files[0];
-            let imageUrl = "";
-            if (file) {
-                const sRef = ref(storage, `products/${Date.now()}_${file.name}`);
-                await uploadBytes(sRef, file);
-                imageUrl = await getDownloadURL(sRef);
-            }
-            products.push({
-                name: div.querySelector('.p-name').value,
-                price: parseFloat(div.querySelector('.p-price').value),
-                unit: div.querySelector('.p-unit').value,
-                totalQty: parseFloat(div.querySelector('.p-total').value),
-                step: parseFloat(div.querySelector('.p-step').value),
-                imageUrl: imageUrl
-            });
-        }
-
-        const data = {
-            sellerName: document.getElementById('sellerName').value,
-            address: document.getElementById('pickupAddress').value,
-            pickupTimes: document.getElementById('pickupTimes').value,
-            pin: document.getElementById('pin').value,
-            items: products, createdAt: new Date(), reservations: []
-        };
-
-        await addDoc(collection(db, "listings"), data);
-        location.reload();
-    } catch (err) {
-        alert("Błąd: " + err.message);
-        btn.disabled = false;
-    }
-};
-
-// --- LOGIKA ZAMÓWIENIA ---
+// --- OKNO ZAMÓWIENIA ---
 window.openOrderModal = async (id, editIdx = null) => {
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
-    
     d.items.forEach((it) => {
         const rem = getRem(it.name, it.totalQty, d.reservations, editingResIndex);
         const startVal = (editingResIndex !== null) ? (d.reservations[editingResIndex].items.find(i => i.name === it.name)?.qty || 0) : 0;
@@ -182,15 +138,47 @@ window.openOrderModal = async (id, editIdx = null) => {
                 </div>
             </div>`;
     });
-    document.getElementById('reservation-modal').classList.remove('hidden');
-    window.updateSum();
+
+    if (editingResIndex === null) {
+        document.getElementById('buyerName').value = localStorage.getItem('ryneczek_name') || '';
+        document.getElementById('buyerPin').value = localStorage.getItem('ryneczek_pin') || '';
+    } else {
+        document.getElementById('buyerName').value = d.reservations[editIdx].buyerName;
+        document.getElementById('buyerPin').value = d.reservations[editIdx].buyerPin;
+        document.getElementById('buyerPickupTime').value = d.reservations[editIdx].time;
+    }
+    document.getElementById('reservation-modal').classList.remove('hidden'); window.updateSum();
 };
 
-window.updateSum = () => {
-    let total = 0;
-    document.querySelectorAll('.order-qty-val').forEach(span => { total += parseFloat(span.innerText) * parseFloat(span.dataset.price); });
-    document.getElementById('modal-total-price').innerText = total.toFixed(2);
-};
+// --- LOGIKA ZAPISU ZAMÓWIENIA ---
+async function handleOrderConfirmation() {
+    const name = document.getElementById('buyerName').value.trim();
+    const pin = document.getElementById('buyerPin').value.trim();
+    const time = document.getElementById('buyerPickupTime').value;
+    const items = [];
+    document.querySelectorAll('.order-qty-val').forEach(span => {
+        const q = parseFloat(span.innerText); if(q > 0) items.push({ name: span.dataset.name, qty: q });
+    });
+
+    if(!name || pin.length !== 4 || items.length === 0) return alert("Uzupełnij dane i wybierz produkty!");
+
+    localStorage.setItem('ryneczek_name', name); localStorage.setItem('ryneczek_pin', pin);
+
+    const refL = doc(db, "listings", currentEditId);
+    const snap = await getDoc(refL);
+    let res = snap.data().reservations || [];
+    const newData = { buyerName: name, buyerPin: pin, time, items };
+
+    if (editingResIndex !== null) res[editingResIndex] = newData;
+    else {
+        const existIdx = res.findIndex(r => r.buyerName.toLowerCase() === name.toLowerCase() && r.buyerPin === pin);
+        if(existIdx !== -1) res[existIdx] = newData;
+        else res.push(newData);
+    }
+
+    await updateDoc(refL, { reservations: res });
+    location.reload();
+}
 
 window.authSeller = async (id, pin) => {
     const inputPin = prompt("Podaj PIN ogłoszenia:");
@@ -198,6 +186,3 @@ window.authSeller = async (id, pin) => {
     currentEditId = id; const snap = await getDoc(doc(db, "listings", id)); cachedListingData = snap.data();
     document.getElementById('seller-modal').classList.remove('hidden');
 };
-
-// URUCHOMIENIE INICJALIZACJI
-initApp();
