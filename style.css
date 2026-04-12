@@ -1,9 +1,11 @@
 :root {
     --primary: #6366f1;
+    --primary-dark: #4f46e5;
     --bg-dark: #0f172a;
+    --card-bg: #ffffff;
     --modal-bg: #1e293b;
     --accent: #10b981;
-    --input-border: #334155;
+    --text-main: #1e293b;
 }
 
 body {
@@ -11,17 +13,15 @@ body {
     background: var(--bg-dark); color: white; margin: 0; padding: 0;
 }
 
-/* GŁÓWNY KONTENER - TO FIXUJE DESKTOP */
-.app-wrapper {
-    max-width: 800px;
+/* CENTROWANIE APLIKACJI */
+.app-container {
+    max-width: 800px; /* Maksymalna szerokość na desktopie */
     margin: 0 auto;
     padding: 20px;
-    display: flex;
-    flex-direction: column;
 }
 
-.main-header { text-align: center; padding: 40px 0; }
-.subtitle { opacity: 0.6; margin-bottom: 25px; display: block; }
+.main-header { text-align: center; padding: 30px 0; }
+.subtitle { opacity: 0.6; margin-bottom: 20px; display: block; }
 
 .btn-add-main {
     background: var(--primary); color: white; border: none;
@@ -30,76 +30,51 @@ body {
     box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
 }
 
-/* LISTA PRODUKTÓW */
-#listings-container { width: 100%; margin-top: 20px; }
-.status-msg { text-align: center; opacity: 0.5; padding: 50px; }
-
+/* KARTA OGŁOSZENIA - POPRAWKI DESKTOP */
 .product-card {
-    background: white; color: #1e293b; border-radius: 24px;
-    overflow: hidden; margin-bottom: 30px; width: 100%;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    background: var(--card-bg); color: var(--text-main);
+    border-radius: 24px; overflow: hidden; margin-bottom: 30px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
 }
 
-.listing-header { padding: 20px; background: #f8fafc; border-bottom: 1px solid #f1f5f9; }
-.listing-header h3 { margin: 0; font-size: 1.3rem; color: #0f172a; }
+.listing-header { padding: 25px; background: #f8fafc; border-bottom: 1px solid #f1f5f9; }
+.listing-header h3 { margin: 0; font-size: 1.4rem; color: #0f172a; }
 
 .product-item-list {
-    display: flex; align-items: center; padding: 15px 20px;
-    border-bottom: 1px solid #f1f5f9; gap: 15px;
+    display: flex; align-items: center; padding: 15px 25px;
+    border-bottom: 1px solid #f1f5f9; gap: 20px;
 }
-.thumb { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; background: #eee; }
+.thumb { width: 65px; height: 65px; border-radius: 12px; object-fit: cover; background: #eee; }
+
+/* STOPKA KARTY Z PRZYCISKAMI */
+.card-footer { 
+    padding: 20px 25px; 
+    display: flex; 
+    gap: 15px; 
+    background: #f8fafc;
+}
+.btn-primary-action { 
+    background: var(--primary); color: white; border: none; 
+    padding: 16px; border-radius: 14px; font-weight: 800; 
+    flex: 1; cursor: pointer; font-size: 1.05rem;
+}
+.btn-manage-small { 
+    background: #e2e8f0; color: #475569; border: none; 
+    padding: 16px; border-radius: 14px; width: 60px;
+    cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+}
 
 /* MODALE */
-.modal { 
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-    background: rgba(0,0,0,0.9); display: flex; align-items: center; 
-    justify-content: center; z-index: 2000; padding: 15px;
-}
-.modal-solid {
-    background: var(--modal-bg); border-radius: 28px; padding: 25px;
-    width: 100%; max-width: 500px; box-sizing: border-box;
-    border: 1px solid rgba(255,255,255,0.1);
-}
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 15px; }
+.modal-solid { background: var(--modal-bg); border-radius: 28px; padding: 30px; width: 100%; max-width: 500px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1); }
 .scrollable-modal { max-height: 90vh; overflow-y: auto; }
 
 /* POLA FORMULARZA */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 @media (max-width: 500px) { .form-grid { grid-template-columns: 1fr; } }
-
 .input-group { margin-bottom: 15px; display: flex; flex-direction: column; text-align: left; }
 .input-group label { font-size: 0.85rem; color: #94a3b8; margin-bottom: 5px; }
-input {
-    padding: 14px; border-radius: 10px; border: 2px solid var(--input-border);
-    background: #0f172a; color: white; font-size: 1rem; width: 100%; box-sizing: border-box;
-}
-
-/* WIDOK ZAMÓWIENIA W MODALU */
-.order-row-mobile {
-    background: rgba(255,255,255,0.03); padding: 15px; border-radius: 16px;
-    margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;
-}
-@media (min-width: 500px) {
-    .order-row-mobile { flex-direction: row; align-items: center; justify-content: space-between; }
-}
-
-.qty-control { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 12px; width: fit-content; }
-.qty-btn { background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 10px; border: none; font-size: 1.2rem; cursor: pointer; }
-.order-qty-val { width: 55px; text-align: center; font-weight: bold; color: white; font-size: 1.1rem; }
-
-.total-bar { 
-    background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 16px; 
-    display: flex; justify-content: space-between; font-weight: 800; font-size: 1.3rem;
-    border: 1px solid var(--accent); color: var(--accent); margin: 20px 0;
-}
-
-.modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
-.btn-primary-action { background: var(--primary); color: white; border: none; padding: 18px; border-radius: 14px; font-weight: 800; cursor: pointer; }
-.btn-warning-action { background: #f59e0b; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; margin-top: 10px; }
-.btn-danger-action { background: #ef4444; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; }
-.btn-close-panel { background: transparent; border: 2px solid #475569; color: #94a3b8; padding: 12px; border-radius: 12px; font-weight: bold; }
+input { padding: 14px; border-radius: 10px; border: 2px solid #334155; background: #0f172a; color: white; width: 100%; box-sizing: border-box; }
 
 .hidden { display: none !important; }
-
-.tabs { display: flex; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 12px; margin: 15px 0; }
-.tab { flex: 1; padding: 10px; border: none; border-radius: 8px; background: transparent; color: #94a3b8; cursor: pointer; font-weight: bold; }
-.tab.active { background: var(--primary); color: white; }
+.total-bar { background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 16px; display: flex; justify-content: space-between; font-weight: 800; font-size: 1.3rem; border: 1px solid var(--accent); color: var(--accent); margin: 20px 0; }
