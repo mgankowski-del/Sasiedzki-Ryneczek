@@ -17,26 +17,42 @@
         </header>
 
         <main id="listings-container">
-            <p class="status-msg">Ładowanie ofert...</p>
+            <p class="status-msg">Ładowanie świeżych ofert...</p>
         </main>
     </div>
 
     <div id="add-listing-modal" class="modal hidden">
         <div class="modal-content modal-solid scrollable-modal">
-            <h2>Nowa oferta</h2>
+            <h2 id="modal-title">Nowa oferta</h2>
             <form id="listing-form">
                 <div class="form-grid">
-                    <div class="input-group"><label>Twoje Imię</label><input type="text" id="sellerName" required></div>
-                    <div class="input-group"><label>Adres odbioru</label><input type="text" id="pickupAddress" required></div>
+                    <div class="input-group">
+                        <label>Twoje Imię</label>
+                        <input type="text" id="sellerName" placeholder="Np. Michał" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Adres odbioru</label>
+                        <input type="text" id="pickupAddress" placeholder="Np. ul. Polna 4" required>
+                    </div>
                 </div>
-                <div class="input-group"><label>Możliwe godziny odbioru</label><input type="text" id="pickupTimes" placeholder="np. Pon-Pt 17-20" required></div>
+                <div class="input-group">
+                    <label>Możliwe godziny odbioru</label>
+                    <input type="text" id="pickupTimes" placeholder="Np. Pon-Pt 17-20" required>
+                </div>
                 <hr class="divider">
+                
                 <div id="products-to-add"></div>
-                <button type="button" id="add-more-items" class="btn-secondary-action">+ Dodaj produkt</button>
-                <div class="input-group" style="margin-top:20px"><label>PIN (do edycji ogłoszenia)</label><input type="text" id="pin" maxlength="4" required></div>
+                
+                <button type="button" id="add-more-items" class="btn-secondary-action">+ Dodaj kolejny produkt</button>
+                
+                <div class="input-group" style="margin-top: 20px;">
+                    <label>PIN ogłoszenia (do edycji)</label>
+                    <input type="text" id="pin" maxlength="4" placeholder="4 cyfry" required>
+                </div>
+                
                 <div class="modal-actions">
-                    <button type="submit" id="submitBtn" class="btn-primary-action">Zapisz i Opublikuj</button>
-                    <button type="button" class="btn-cancel-action" id="close-add-modal">Anuluj</button>
+                    <button type="submit" id="submitBtn" class="btn-primary-action">Opublikuj ofertę</button>
+                    <button type="button" class="btn-cancel-action" onclick="closeModals()">Anuluj</button>
                 </div>
             </form>
         </div>
@@ -47,15 +63,27 @@
             <h3>Twoje zamówienie</h3>
             <p id="buyer-status-msg" class="info-note">💡 Podaj imię i PIN, by zamówić lub zmienić.</p>
             <div id="modal-order-items"></div>
-            <div class="total-bar"><span>Razem:</span><span><span id="modal-total-price">0.00</span> zł</span></div>
-            <div class="form-grid">
-                <div class="input-group"><label>Twoje imię</label><input type="text" id="buyerName" required></div>
-                <div class="input-group"><label>PIN (4 cyfry)</label><input type="text" id="buyerPin" maxlength="4" required></div>
+            <div class="total-bar">
+                <span>Razem:</span>
+                <span><span id="modal-total-price">0.00</span> zł</span>
             </div>
-            <div class="input-group"><label>Kiedy odbierzesz?</label><input type="text" id="buyerPickupTime" required></div>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Twoje imię:</label>
+                    <input type="text" id="buyerName" required>
+                </div>
+                <div class="input-group">
+                    <label>Twój PIN (4 cyfry):</label>
+                    <input type="text" id="buyerPin" maxlength="4" required>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Kiedy odbierzesz?</label>
+                <input type="text" id="buyerPickupTime" placeholder="Np. Jutro o 10:00" required>
+            </div>
             <div class="modal-actions">
                 <button id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
-                <button type="button" class="btn-cancel-action" id="close-res-modal">Anuluj</button>
+                <button type="button" class="btn-cancel-action" onclick="closeModals()">Anuluj</button>
             </div>
         </div>
     </div>
@@ -71,7 +99,7 @@
             <div class="modal-actions">
                 <button id="edit-listing-btn" class="btn-warning-action">✏️ Modyfikuj ogłoszenie</button>
                 <button id="delete-listing-btn" class="btn-danger-action">🗑️ Usuń całą ofertę</button>
-                <button type="button" class="btn-cancel-action" id="close-seller-modal">Zamknij</button>
+                <button type="button" class="btn-cancel-action" onclick="closeModals()">Zamknij</button>
             </div>
         </div>
     </div>

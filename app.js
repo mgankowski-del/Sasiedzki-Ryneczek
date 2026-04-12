@@ -18,30 +18,30 @@ const storage = getStorage(app);
 let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
+let isEditingOffer = false;
 
-// FUNKCJE POMOCNICZE
+// POMOCNICZA: DOSTĘPNOŚĆ
 const getRem = (name, total, res, ignoreIdx = null) => {
     let reserved = 0;
     res.forEach((r, idx) => { if (ignoreIdx !== null && idx === ignoreIdx) return; const item = r.items.find(i => i.name === name); if (item) reserved += parseFloat(item.qty); });
     return Math.max(0, total - reserved);
 };
 
+// ZAMYKANIE MODALI
 window.closeModals = () => {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+    isEditingOffer = false;
 };
 
-// NAPRAWA PRZYCISKU DODAWANIA
-const openAddListing = () => {
-    document.getElementById('modal-title').innerText = "Nowa oferta";
-    document.getElementById('listing-form').reset();
-    document.getElementById('products-to-add').innerHTML = '';
-    document.getElementById('products-to-add').appendChild(createProductFields());
-    document.getElementById('add-listing-modal').classList.remove('hidden');
-};
-
+// --- LOGIKA DODAWANIA PRODUKTÓW W FORMULARZU ---
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
-    div.className = 'product-item-form';
+    div.className = 'product-item-form glass-card-dark';
+    div.style.marginBottom = "15px";
+    div.style.padding = "15px";
+    div.style.border = "1px solid rgba(255,255,255,0.1)";
+    div.style.borderRadius = "12px";
+
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
         <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
@@ -57,22 +57,28 @@ const createProductFields = (data = {}) => {
     return div;
 };
 
-// PODPIĘCIE ZDARZEŃ PO ZAŁADOWANIU DOM
+// --- INICJALIZACJA PRZYCISKÓW ---
 document.addEventListener('DOMContentLoaded', () => {
-    const btnAdd = document.getElementById('btn-open-add');
-    if (btnAdd) btnAdd.onclick = openAddListing;
+    // NAPRAWA PRZYCISKU OTWIERANIA
+    const btnOpenAdd = document.getElementById('btn-open-add');
+    if(btnOpenAdd) {
+        btnOpenAdd.addEventListener('click', () => {
+            isEditingOffer = false;
+            document.getElementById('modal-title').innerText = "Nowa oferta";
+            document.getElementById('listing-form').reset();
+            document.getElementById('products-to-add').innerHTML = '';
+            document.getElementById('products-to-add').appendChild(createProductFields());
+            document.getElementById('add-listing-modal').classList.remove('hidden');
+        });
+    }
 
+    // DODAWANIE KOLEJNYCH PRODUKTÓW
     document.getElementById('add-more-items').onclick = () => {
         document.getElementById('products-to-add').appendChild(createProductFields());
     };
-
-    // Zamykanie przyciskami "Anuluj"
-    document.getElementById('close-add-modal').onclick = window.closeModals;
-    document.getElementById('close-res-modal').onclick = window.closeModals;
-    document.getElementById('close-seller-modal').onclick = window.closeModals;
 });
 
-// ŁADOWANIE OGŁOSZEŃ
+// --- ŁADOWANIE OGŁOSZEŃ ---
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
@@ -101,7 +107,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     });
 });
 
-// LOGIKA ZAMÓWIENIA
+// --- LOGIKA ZAMÓWIENIA ---
 window.openOrderModal = async (id, editIdx = null) => {
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
@@ -114,11 +120,22 @@ window.openOrderModal = async (id, editIdx = null) => {
                 <div style="flex:1"><b style="display:block; color:white;">${it.name}</b><small style="color:var(--accent)">Dostępne: ${rem}</small></div>
                 <div style="display:flex; align-items:center; gap:10px;">
                     <button type="button" class="qty-btn" style="width:40px; height:40px; background:var(--primary); border:none; border-radius:10px; color:white;" onclick="const s = this.nextElementSibling; s.innerText = Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2); window.updateSum();">-</button>
-                    <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="min-width:40px; text-align:center; font-weight:bold;">${parseFloat(startVal).toFixed(2)}</span>
-                    <button type="button" class="qty-btn" style="width:40px; height:40px; background:var(--primary); border:none; border-radius:10px; color:white;" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=(parseFloat(s.innerText)+${it.step}).toFixed(2);window.updateSum();} else {alert('Brak!');}">+</button>
+                    <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="min-width:45px; text-align:center; font-weight:bold;">${parseFloat(startVal).toFixed(2)}</span>
+                    <button type="button" class="qty-btn" style="width:40px; height:40px; background:var(--primary); border:none; border-radius:10px; color:white;" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=(parseFloat(s.innerText)+${it.step}).toFixed(2);window.updateSum();} else {alert('Brak towaru!');}">+</button>
                 </div>
             </div>`;
     });
+
+    if (editingResIndex === null) {
+        document.getElementById('buyerName').value = localStorage.getItem('ryneczek_name') || '';
+        document.getElementById('buyerPin').value = localStorage.getItem('ryneczek_pin') || '';
+        if(document.getElementById('buyerName').value) lookUpOrder();
+    } else {
+        document.getElementById('buyerName').value = d.reservations[editingResIndex].buyerName;
+        document.getElementById('buyerPin').value = d.reservations[editingResIndex].buyerPin;
+        document.getElementById('buyerPickupTime').value = d.reservations[editingResIndex].time;
+    }
+
     document.getElementById('reservation-modal').classList.remove('hidden'); window.updateSum();
 };
 
@@ -127,52 +144,7 @@ window.updateSum = () => {
     document.getElementById('modal-total-price').innerText = (Math.round(total * 100) / 100).toFixed(2);
 };
 
-window.authSeller = async (id, pin) => {
-    const inputPin = prompt("Podaj PIN ogłoszenia:");
-    if(inputPin !== pin) return alert("Błędny PIN");
-    currentEditId = id; const snap = await getDoc(doc(db, "listings", id)); cachedListingData = snap.data();
-    renderSellerView('person'); document.getElementById('seller-modal').classList.remove('hidden');
-};
-
-const renderSellerView = (type) => {
-    const container = document.getElementById('reservations-container');
-    container.innerHTML = ''; const d = cachedListingData;
-    document.getElementById('view-by-person').classList.toggle('active', type === 'person');
-    document.getElementById('view-by-product').classList.toggle('active', type === 'product');
-
-    if (type === 'person') {
-        d.reservations.forEach((r, idx) => {
-            let pTotal = 0;
-            const itemsRows = r.items.map(i => {
-                const prod = d.items.find(pi => pi.name === i.name); const st = prod ? i.qty * prod.price : 0; pTotal += st;
-                return `<div class="buyer-line"><span>${i.name} (x${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
-            }).join('');
-            container.innerHTML += `<div class="res-product-row">
-                <div class="res-product-header"><span class="res-name">👤 ${r.buyerName}</span><small>⏰ ${r.time}</small></div>
-                ${itemsRows}<div class="res-total-line">Suma: ${pTotal.toFixed(2)} zł</div>
-                <button onclick="openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; margin-top:10px; font-size:0.85rem">✏️ Edytuj</button>
-            </div>`;
-        });
-    } else {
-        d.items.forEach(product => {
-            let pGrand = 0; let tSold = 0;
-            const bRows = d.reservations.map(r => {
-                const f = r.items.find(i => i.name === product.name);
-                if (f) { pGrand += f.qty * product.price; tSold += f.qty; return `<div class="buyer-line"><span>👤 ${r.buyerName}</span> <b>${f.qty} ${product.unit}</b></div>`; }
-                return '';
-            }).join('');
-            container.innerHTML += `<div class="res-product-row">
-                <div class="res-product-header"><span class="res-name">📦 ${product.name}</span><span class="res-sold">Sprzedano: ${tSold}/${product.totalQty}</span></div>
-                ${bRows || '<div style="opacity:0.5; font-size:0.85rem">Brak zamówień</div>'}
-                <div class="res-total-line">Razem: ${pGrand.toFixed(2)} zł</div>
-            </div>`;
-        });
-    }
-};
-
-document.getElementById('view-by-person').onclick = () => renderSellerView('person');
-document.getElementById('view-by-product').onclick = () => renderSellerView('product');
-
+// --- LOGIKA FORMULARZA OFERTY ---
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn'); btn.disabled = true;
@@ -191,27 +163,84 @@ document.getElementById('listing-form').onsubmit = async (e) => {
         address: document.getElementById('pickupAddress').value,
         pickupTimes: document.getElementById('pickupTimes').value,
         pin: document.getElementById('pin').value,
-        items: products, createdAt: new Date(), reservations: []
+        items: products, updatedAt: new Date(), reservations: cachedListingData?.reservations || []
     };
-    await addDoc(collection(db, "listings"), data);
+    
+    if(isEditingOffer) await updateDoc(doc(db, "listings", currentEditId), data);
+    else { data.createdAt = new Date(); await addDoc(collection(db, "listings"), data); }
+    
     location.reload();
 };
+
+// --- PANEL SPRZEDAWCY ---
+window.authSeller = async (id, pin) => {
+    const inputPin = prompt("Podaj PIN ogłoszenia:");
+    if(inputPin !== pin) return alert("Błędny PIN!");
+    currentEditId = id; const snap = await getDoc(doc(db, "listings", id)); cachedListingData = snap.data();
+    renderSellerView('person'); document.getElementById('seller-modal').classList.remove('hidden');
+};
+
+const renderSellerView = (type) => {
+    const container = document.getElementById('reservations-container');
+    container.innerHTML = ''; const d = cachedListingData;
+    document.getElementById('view-by-person').classList.toggle('active', type === 'person');
+    document.getElementById('view-by-product').classList.toggle('active', type === 'product');
+
+    if (type === 'person') {
+        d.reservations.forEach((r, idx) => {
+            let pTotal = 0;
+            const itemsRows = r.items.map(i => {
+                const prod = d.items.find(pi => pi.name === i.name); const st = prod ? i.qty * prod.price : 0; pTotal += st;
+                return `<div class="buyer-line"><span>${i.name} (x${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
+            }).join('');
+            container.innerHTML += `<div class="res-product-row">
+                <div style="display:flex;justify-content:space-between;margin-bottom:10px"><b style="color:var(--accent)">👤 ${r.buyerName}</b><small>⏰ ${r.time}</small></div>
+                ${itemsRows}<div class="res-total-line">Do zapłaty: ${pTotal.toFixed(2)} zł</div>
+                <button onclick="openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; margin-top:10px; font-size:0.85rem">✏️ Edytuj zamówienie sąsiada</button>
+            </div>`;
+        });
+    } else {
+        d.items.forEach(product => {
+            let pGrand = 0; let tSold = 0;
+            const bRows = d.reservations.map(r => {
+                const f = r.items.find(i => i.name === product.name);
+                if (f) { pGrand += f.qty * product.price; tSold += f.qty; return `<div class="buyer-line"><span>👤 ${r.buyerName}</span> <b>${f.qty} ${product.unit}</b></div>`; }
+                return '';
+            }).join('');
+            container.innerHTML += `<div class="res-product-row">
+                <div class="res-product-header"><span class="res-name">📦 ${product.name}</span><span class="res-sold">Sprzedano: ${tSold}/${product.totalQty}</span></div>
+                ${bRows || '<div style="opacity:0.5; font-size:0.85rem">Brak zamówień</div>'}
+                <div class="res-total-line">Suma: ${pGrand.toFixed(2)} zł</div>
+            </div>`;
+        });
+    }
+};
+
+document.getElementById('view-by-person').onclick = () => renderSellerView('person');
+document.getElementById('view-by-product').onclick = () => renderSellerView('product');
+
+document.getElementById('edit-listing-btn').onclick = () => {
+    isEditingOffer = true; const d = cachedListingData;
+    document.getElementById('sellerName').value = d.sellerName;
+    document.getElementById('pickupAddress').value = d.address;
+    document.getElementById('pickupTimes').value = d.pickupTimes;
+    document.getElementById('pin').value = d.pin;
+    document.getElementById('products-to-add').innerHTML = '';
+    d.items.forEach(it => document.getElementById('products-to-add').appendChild(createProductFields(it)));
+    document.getElementById('seller-modal').classList.add('hidden');
+    document.getElementById('add-listing-modal').classList.remove('hidden');
+    document.getElementById('modal-title').innerText = "Modyfikuj ofertę";
+};
+
+document.getElementById('delete-listing-btn').onclick = async () => { if(confirm("Usunąć ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); } };
 
 document.getElementById('confirm-booking-btn').onclick = async () => {
-    const name = document.getElementById('buyerName').value.trim();
-    const pin = document.getElementById('buyerPin').value.trim();
-    const items = [];
-    document.querySelectorAll('.order-qty-val').forEach(span => {
-        const q = parseFloat(span.innerText); if(q > 0) items.push({ name: span.dataset.name, qty: q });
-    });
+    const name = document.getElementById('buyerName').value.trim(); const pin = document.getElementById('buyerPin').value.trim();
+    const items = []; document.querySelectorAll('.order-qty-val').forEach(span => { const q = parseFloat(span.innerText); if(q > 0) items.push({ name: span.dataset.name, qty: q }); });
     if(!name || pin.length !== 4 || items.length === 0) return alert("Uzupełnij dane!");
-    const refL = doc(db, "listings", currentEditId);
-    const snap = await getDoc(refL);
-    let res = snap.data().reservations || [];
+    localStorage.setItem('ryneczek_name', name); localStorage.setItem('ryneczek_pin', pin);
+    const refL = doc(db, "listings", currentEditId); const snap = await getDoc(refL); let res = snap.data().reservations || [];
     const newData = { buyerName: name, buyerPin: pin, time: document.getElementById('buyerPickupTime').value, items };
     if (editingResIndex !== null) res[editingResIndex] = newData; else res.push(newData);
-    await updateDoc(refL, { reservations: res });
-    location.reload();
+    await updateDoc(refL, { reservations: res }); location.reload();
 };
-
-document.getElementById('delete-listing-btn').onclick = async () => { if(confirm("Usunąć?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); } };
