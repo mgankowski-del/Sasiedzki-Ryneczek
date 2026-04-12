@@ -19,20 +19,23 @@ let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 
+// POMOCNICZA: DOSTĘPNOŚĆ
 const getRem = (name, total, res, ignoreIdx = null) => {
     let reserved = 0;
     res.forEach((r, idx) => { if (ignoreIdx !== null && idx === ignoreIdx) return; const item = r.items.find(i => i.name === name); if (item) reserved += parseFloat(item.qty); });
     return Math.max(0, total - reserved);
 };
 
-// --- OTWIERANIE MODALA (Naprawione!) ---
-document.getElementById('open-add-listing-btn').onclick = () => {
+// --- OTWIERANIE MODALA DODAWANIA (NAPRAWIONE) ---
+const openAddModal = () => {
     document.getElementById('modal-title').innerText = "Nowa oferta";
     document.getElementById('listing-form').reset();
     document.getElementById('products-to-add').innerHTML = '';
     document.getElementById('products-to-add').appendChild(createProductFields());
     document.getElementById('add-listing-modal').classList.remove('hidden');
 };
+// Rejestracja kliknięcia
+document.getElementById('btn-open-add').addEventListener('click', openAddModal);
 
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
@@ -40,15 +43,14 @@ const createProductFields = (data = {}) => {
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
         <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
-        <div class="row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+        <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
             <div class="input-group"><label>Jednostka</label><select class="p-unit"><option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option><option value="kg" ${data.unit==='kg'?'selected':''}>kg</option><option value="g" ${data.unit==='g'?'selected':''}>g</option></select></div>
         </div>
-        <div class="row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+        <div class="form-grid">
             <div class="input-group"><label>Łączna ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
             <div class="input-group"><label>Krok zamówienia</label><select class="p-step"><option value="0.25" ${initialStep==0.25?'selected':''}>0.25</option><option value="0.5" ${initialStep==0.5?'selected':''}>0.5</option><option value="0.75" ${initialStep==0.75?'selected':''}>0.75</option><option value="1" ${initialStep==1?'selected':''}>1.0</option></select></div>
         </div>
-        <input type="file" class="p-file" style="margin-top:5px">
     `;
     return div;
 };
@@ -77,9 +79,9 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
                     <small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${rem} ${it.unit}</small></div>
                 </div>`;
             }).join('')}
-            <div class="card-footer" style="padding:15px; display:flex; gap:10px; background:#f8fafc">
-                <button class="btn-primary-action" style="flex:1" onclick="openOrderModal('${id}')">🛒 Zamów / Zmień</button>
-                <button class="btn-cancel-action" style="width:60px" onclick="authSeller('${id}', '${d.pin}')">⚙️</button>
+            <div class="card-footer">
+                <button class="btn-primary-action" onclick="openOrderModal('${id}')">🛒 Zamów / Zmień</button>
+                <button class="btn-manage-gear" onclick="authSeller('${id}', '${d.pin}')">⚙️</button>
             </div>
         `;
         cont.appendChild(card);
@@ -98,17 +100,13 @@ window.openOrderModal = async (id, editIdx = null) => {
             <div class="order-row-mobile" style="background:rgba(255,255,255,0.03); padding:15px; border-radius:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                 <div style="flex:1"><b style="display:block; color:white;">${it.name}</b><small style="color:var(--accent)">Dostępne: ${rem}</small></div>
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <button type="button" class="qty-btn" style="width:40px; height:40px; background:var(--primary); border:none; border-radius:10px; color:white;" onclick="const s = this.nextElementSibling; s.innerText = Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2); updateSum();">-</button>
+                    <button type="button" class="qty-btn" style="width:40px; height:40px; background:var(--primary); border:none; border-radius:10px; color:white;" onclick="const s = this.nextElementSibling; s.innerText = Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2); window.updateSum();">-</button>
                     <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="min-width:40px; text-align:center; font-weight:bold;">${parseFloat(startVal).toFixed(2)}</span>
-                    <button type="button" class="qty-btn" style="width:40px; height:40px; background:var(--primary); border:none; border-radius:10px; color:white;" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=(parseFloat(s.innerText)+${it.step}).toFixed(2);updateSum();} else {alert('Brak!');}">+</button>
+                    <button type="button" class="qty-btn" style="width:40px; height:40px; background:var(--primary); border:none; border-radius:10px; color:white;" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=(parseFloat(s.innerText)+${it.step}).toFixed(2);window.updateSum();} else {alert('Brak!');}">+</button>
                 </div>
             </div>`;
     });
-    if (editingResIndex === null) {
-        document.getElementById('buyerName').value = localStorage.getItem('ryneczek_name') || '';
-        document.getElementById('buyerPin').value = localStorage.getItem('ryneczek_pin') || '';
-    }
-    document.getElementById('reservation-modal').classList.remove('hidden'); updateSum();
+    document.getElementById('reservation-modal').classList.remove('hidden'); window.updateSum();
 };
 
 window.updateSum = () => {
@@ -133,13 +131,12 @@ const renderSellerView = (type) => {
             let pTotal = 0;
             const itemsRows = r.items.map(i => {
                 const prod = d.items.find(pi => pi.name === i.name); const st = prod ? i.qty * prod.price : 0; pTotal += st;
-                return `<div style="display:flex;justify-content:space-between;font-size:0.95rem;margin-bottom:4px"><span>${i.name} (x${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
+                return `<div class="buyer-line"><span>${i.name} (x${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
             }).join('');
             container.innerHTML += `<div class="res-product-row">
-                <div style="display:flex;justify-content:space-between;margin-bottom:10px"><b style="color:var(--accent)">👤 ${r.buyerName}</b><small>⏰ ${r.time}</small></div>
-                ${itemsRows}
-                <div class="res-product-total">Suma: ${pTotal.toFixed(2)} zł</div>
-                <button onclick="openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; width:100%; margin-top:10px; font-size:0.8rem">✏️ Edytuj</button>
+                <div class="res-product-header"><span class="res-name">👤 ${r.buyerName}</span><small>⏰ ${r.time}</small></div>
+                ${itemsRows}<div class="res-total-line">Do zapłaty: ${pTotal.toFixed(2)} zł</div>
+                <button onclick="openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; margin-top:10px; font-size:0.85rem">✏️ Edytuj zamówienie sąsiada</button>
             </div>`;
         });
     } else {
@@ -147,21 +144,19 @@ const renderSellerView = (type) => {
             let pGrand = 0; let tSold = 0;
             const bRows = d.reservations.map(r => {
                 const f = r.items.find(i => i.name === product.name);
-                if (f) { pGrand += f.qty * product.price; tSold += f.qty; return `<div class="res-buyer-line"><span>👤 ${r.buyerName}</span> <b>${f.qty} ${product.unit}</b></div>`; }
+                if (f) { pGrand += f.qty * product.price; tSold += f.qty; return `<div class="buyer-line"><span>👤 ${r.buyerName}</span> <b>${f.qty} ${product.unit}</b></div>`; }
                 return '';
             }).join('');
             container.innerHTML += `<div class="res-product-row">
-                <div class="res-product-header"><span class="res-product-name">📦 ${product.name}</span><span class="res-product-sold">Sprzedano: ${tSold}/${product.totalQty}</span></div>
-                ${bRows || '<div style="opacity:0.5; font-size:0.8rem">Brak zamówień</div>'}
-                <div class="res-product-total">Razem: ${pGrand.toFixed(2)} zł</div>
+                <div class="res-product-header"><span class="res-name">📦 ${product.name}</span><span class="res-sold">Sprzedano: ${tSold}/${product.totalQty}</span></div>
+                ${bRows || '<div style="opacity:0.5; font-size:0.85rem">Brak zamówień</div>'}
+                <div class="res-total-line">Razem ze sprzedaży: ${pGrand.toFixed(2)} zł</div>
             </div>`;
         });
     }
 };
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
-
 document.getElementById('view-by-person').onclick = () => renderSellerView('person');
 document.getElementById('view-by-product').onclick = () => renderSellerView('product');
-
-document.getElementById('delete-listing-btn').onclick = async () => { if(confirm("Usunąć?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); } };
+document.getElementById('delete-listing-btn').onclick = async () => { if(confirm("Usunąć ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); } };
