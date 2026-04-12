@@ -20,7 +20,6 @@ let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 
-// OBLICZANIE POZOSTAŁEJ ILOŚCI
 const getRem = (name, total, res) => {
     let reserved = 0;
     res.forEach(r => {
@@ -123,7 +122,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
                     ${it.imageUrl ? `<img src="${it.imageUrl}" class="thumb">` : '🖼️'} 
                     <div style="flex:1">
                         <b>${it.name}</b><br>
-                        <small style="color:#64748b">Cena: ${it.price} zł / ${it.unit} | Min: ${it.step}</small><br>
+                        <small style="color:#64748b">Cena: ${it.price} zł / ${it.unit} | Krok: ${it.step}</small><br>
                         <small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${rem} ${it.unit}</small>
                     </div>
                 </div>`;
@@ -166,6 +165,7 @@ window.updateSum = () => {
 
 document.getElementById('confirm-booking-btn').onclick = async () => {
     const buyerName = document.getElementById('buyerName').value.trim(); 
+    const buyerPin = document.getElementById('buyerPin').value.trim();
     const time = document.getElementById('buyerPickupTime').value;
     const items = []; 
     document.querySelectorAll('.order-qty').forEach((input, idx) => {
@@ -173,29 +173,33 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         if(q > 0) items.push({ name: document.querySelectorAll('.product-item-list span')[idx].innerText, qty: q });
     });
 
-    if(!buyerName || items.length === 0) return alert("Podaj imię i wybierz produkty!");
+    if(!buyerName || !buyerPin || items.length === 0) return alert("Wypełnij imię, PIN i wybierz produkty!");
 
     const refListing = doc(db, "listings", currentEditId); 
     const snap = await getDoc(refListing);
     let res = snap.data().reservations;
 
-    // LOGIKA ZMIANY ZAMÓWIENIA
+    // LOGIKA ODSZUKIWANIA / ZMIANY ZAMÓWIENIA
     const existingIndex = res.findIndex(r => r.buyerName.toLowerCase() === buyerName.toLowerCase());
     
     if (existingIndex !== -1 && editingResIndex === null) {
-        if (!confirm(`Sąsiedzie! Znalazłem już Twoje zamówienie (${buyerName}). Czy chcesz je nadpisać nowymi danymi?`)) return;
-        res[existingIndex] = { buyerName, time, items };
+        if (res[existingIndex].buyerPin !== buyerPin) {
+            return alert("To imię jest już zajęte. Jeśli to Twoje zamówienie – podaj poprawny PIN. Jeśli nie – użyj innego imienia (np. dodaj nazwisko).");
+        }
+        if (!confirm("Odnaleziono Twoje zamówienie. Czy chcesz zapisać nową wersję?")) return;
+        res[existingIndex] = { buyerName, buyerPin, time, items };
     } else if (editingResIndex !== null) {
-        res[editingResIndex] = { buyerName, time, items };
+        // Zmiana z poziomu Panelu Sprzedawcy (on ma PIN ogłoszenia, więc może)
+        res[editingResIndex] = { buyerName, buyerPin: res[editingResIndex].buyerPin, time, items };
     } else {
-        res.push({ buyerName, time, items });
+        res.push({ buyerName, buyerPin, time, items });
     }
 
     await updateDoc(refListing, { reservations: res }); location.reload();
 };
 
 window.authSeller = async (id, pin) => {
-    if(prompt("Podaj PIN:") !== pin) return alert("Błędny PIN");
+    if(prompt("Podaj PIN ogłoszenia:") !== pin) return alert("Błędny PIN");
     currentEditId = id; const snap = await getDoc(doc(db, "listings", id));
     cachedListingData = snap.data(); renderSellerView('person');
     document.getElementById('seller-modal').classList.remove('hidden');

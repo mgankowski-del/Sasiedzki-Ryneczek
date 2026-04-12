@@ -43,13 +43,12 @@
                 </div>
                 <hr>
                 <div id="products-to-add"></div>
-                
                 <button type="button" id="add-more-items" class="btn-secondary">+ Dodaj kolejny produkt</button>
                 
                 <div class="row" style="margin-top: 20px;">
                     <div class="input-group">
-                        <label>PIN (4 cyfry)</label>
-                        <input type="password" id="pin" maxlength="4" required>
+                        <label>PIN ogłoszenia (widoczny)</label>
+                        <input type="text" id="pin" maxlength="4" placeholder="4 cyfry" required>
                     </div>
                 </div>
                 <button type="submit" id="submitBtn" class="btn-primary">Zapisz i Opublikuj</button>
@@ -61,16 +60,25 @@
     <div id="reservation-modal" class="modal hidden">
         <div class="modal-content modal-solid">
             <h3 id="res-modal-title">Twoje zamówienie</h3>
+            <p class="info-text">💡 Jeśli już zamawiałeś, podaj to samo imię i PIN, by zmienić zamówienie.</p>
             <div id="modal-order-items"></div>
             <div class="total-summary">Razem: <span id="modal-total-price">0.00</span> zł</div>
-            <div class="input-group">
-                <label>Twoje imię:</label>
-                <input type="text" id="buyerName" placeholder="Wpisz imię, by złożyć lub zmienić zamówienie" required>
+            
+            <div class="row">
+                <div class="input-group">
+                    <label>Twoje imię:</label>
+                    <input type="text" id="buyerName" placeholder="Imię" required>
+                </div>
+                <div class="input-group">
+                    <label>Twój PIN (4 cyfry):</label>
+                    <input type="text" id="buyerPin" maxlength="4" placeholder="Kod" required>
+                </div>
             </div>
             <div class="input-group">
                 <label>Kiedy odbierzesz?</label>
-                <input type="text" id="buyerPickupTime" required>
+                <input type="text" id="buyerPickupTime" placeholder="Np. Dziś wieczorem" required>
             </div>
+            
             <div class="modal-buttons">
                 <button id="confirm-booking-btn" class="btn-primary">Zatwierdź zamówienie</button>
                 <button onclick="closeModals()" class="btn-cancel">Anuluj</button>
@@ -87,7 +95,7 @@
             </div>
             <div id="reservations-container" class="reservations-panel"></div>
             <div class="modal-buttons-grid">
-                <button id="edit-listing-btn" class="btn-edit">✏️ Modyfikuj</button>
+                <button id="edit-listing-btn" class="btn-edit">✏️ Modyfikuj ofertę</button>
                 <button id="delete-listing-btn" class="btn-delete">🗑️ Usuń ofertę</button>
             </div>
             <button onclick="closeModals()" class="btn-cancel">Zamknij</button>

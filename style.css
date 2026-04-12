@@ -25,13 +25,10 @@ header { text-align: center; margin-bottom: 40px; }
 .scrollable-modal { max-height: 90vh; overflow-y: auto; }
 .hidden { display: none !important; }
 
-/* KONTENER ZDJĘCIA */
-.photo-row {
-    display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.2);
-    padding: 10px; border-radius: 10px; margin-top: 5px;
-}
+.info-text { font-size: 0.85rem; color: #818cf8; background: rgba(99,102,241,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px dashed var(--primary); }
+
+.photo-row { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; margin-top: 5px; }
 .photo-row label { margin: 0 !important; font-size: 0.8rem; cursor: pointer; }
-.photo-row input[type="checkbox"] { width: 18px; height: 18px; }
 
 .input-group { margin-bottom: 15px; display: flex; flex-direction: column; text-align: left; }
 .input-group label { font-size: 0.85rem; margin-bottom: 5px; color: #94a3b8; }
@@ -44,19 +41,19 @@ input, select { padding: 12px; border-radius: 10px; border: 1px solid #334155; b
 .product-item-list { display: flex; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; gap: 15px; }
 .thumb { width: 55px; height: 55px; border-radius: 8px; object-fit: cover; }
 
-.card-footer { padding: 20px; display: flex; gap: 10px; align-items: center; }
-.btn-primary { background: var(--primary); color: white; padding: 15px 30px; border-radius: 12px; font-weight: bold; cursor: pointer; border: none; flex: 2; }
-.btn-manage { background: #e2e8f0; color: #475569; padding: 15px 20px; border-radius: 12px; font-weight: bold; cursor: pointer; border: none; flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; }
+.card-footer { padding: 20px; display: flex; gap: 10px; }
+.btn-primary { background: var(--primary); color: white; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; border: none; flex: 2; }
+.btn-manage { background: #e2e8f0; color: #475569; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; border: none; flex: 1; }
 
 .modal-buttons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-.btn-secondary { background: rgba(255,255,255,0.1); color: white; padding: 10px; width: 100%; border-radius: 10px; border: none; cursor: pointer; }
+.btn-secondary { background: rgba(255,255,255,0.1); color: white; padding: 10px; border: none; border-radius: 10px; cursor: pointer; }
 .btn-edit { background: #f59e0b; color: white; border-radius: 12px; padding: 12px; border: none; font-weight: bold; }
 .btn-delete { background: #ef4444; color: white; border-radius: 12px; padding: 12px; border: none; font-weight: bold; }
 .btn-cancel { background: transparent; color: #94a3b8; width: 100%; margin-top: 10px; border: none; cursor: pointer; font-weight: bold; }
 
 .qty-control { display: flex; align-items: center; gap: 10px; }
-.qty-btn { background: var(--primary); color: white; width: 35px; height: 35px; border-radius: 50%; border: none; cursor: pointer; font-weight: bold; }
+.qty-btn { background: var(--primary); color: white; width: 35px; height: 35px; border-radius: 50%; border: none; cursor: pointer; }
 .order-qty { width: 80px !important; text-align: center; border: none !important; font-weight: bold; background: transparent !important; }
 
-.total-summary { font-size: 1.4rem; font-weight: bold; text-align: center; margin: 20px 0; color: #818cf8; }
-.glass-card-dark { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
+.total-summary { font-size: 1.4rem; font-weight: bold; text-align: center; margin: 15px 0; color: #818cf8; }
+.glass-card-dark { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
