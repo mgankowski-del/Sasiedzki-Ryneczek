@@ -10,32 +10,32 @@
     <div class="app-container">
         <header class="main-header">
             <h1>Sąsiedzki Ryneczek</h1>
-            <p class="subtitle">Domowe produkty od Twoich sąsiadów</p>
+            <p class="subtitle">Domowe produkty od sąsiadów</p>
             <div class="top-action">
                 <button id="btn-open-add" class="btn-add-main">➕ Opublikuj nową ofertę</button>
             </div>
         </header>
 
         <main id="listings-container">
-            <p class="status-msg">Inicjalizacja Ryneczku...</p>
+            <p class="status-msg">Ładowanie świeżych ofert...</p>
         </main>
     </div>
 
     <div id="add-listing-modal" class="modal hidden">
         <div class="modal-content modal-solid scrollable-modal">
-            <h2>Nowa oferta</h2>
+            <h2 id="listing-modal-title">Nowa oferta</h2>
             <form id="listing-form">
                 <div class="form-grid">
-                    <div class="input-group"><label>Twoje Imię</label><input type="text" id="sellerName" placeholder="Imię" required></div>
-                    <div class="input-group"><label>Adres odbioru</label><input type="text" id="pickupAddress" placeholder="Adres" required></div>
+                    <div class="input-group"><label>Twoje Imię</label><input type="text" id="sellerName" required></div>
+                    <div class="input-group"><label>Adres odbioru</label><input type="text" id="pickupAddress" required></div>
                 </div>
                 <div class="input-group"><label>Możliwe godziny odbioru</label><input type="text" id="pickupTimes" placeholder="Np. Pon-Pt 17-20" required></div>
                 <hr class="divider">
                 <div id="products-to-add"></div>
-                <button type="button" id="add-more-items" class="btn-secondary-action">+ Dodaj kolejny produkt</button>
-                <div class="input-group" style="margin-top: 20px;"><label>PIN ogłoszenia (4 cyfry)</label><input type="text" id="pin" maxlength="4" required></div>
+                <button type="button" id="btn-add-item-row" class="btn-secondary-action">+ Dodaj kolejny produkt</button>
+                <div class="input-group" style="margin-top:20px"><label>PIN (do edycji ogłoszenia)</label><input type="text" id="pin" maxlength="4" required></div>
                 <div class="modal-actions">
-                    <button type="submit" id="submitBtn" class="btn-primary-action">Opublikuj ofertę</button>
+                    <button type="submit" id="submitBtn" class="btn-primary-action">Zapisz i Opublikuj</button>
                     <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Anuluj</button>
                 </div>
             </form>
@@ -50,11 +50,11 @@
             <div class="total-bar"><span>Razem:</span><span><span id="modal-total-price">0.00</span> zł</span></div>
             <div class="form-grid">
                 <div class="input-group"><label>Twoje imię</label><input type="text" id="buyerName" required></div>
-                <div class="input-group"><label>Twój PIN (4 cyfry)</label><input type="text" id="buyerPin" maxlength="4" required></div>
+                <div class="input-group"><label>PIN (4 cyfry)</label><input type="text" id="buyerPin" maxlength="4" required></div>
             </div>
             <div class="input-group"><label>Kiedy odbierzesz?</label><input type="text" id="buyerPickupTime" required></div>
             <div class="modal-actions">
-                <button type="button" id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
+                <button type="button" id="btn-confirm-order" class="btn-primary-action">Zatwierdź zamówienie</button>
                 <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Anuluj</button>
             </div>
         </div>
@@ -69,8 +69,8 @@
             </div>
             <div id="reservations-container"></div>
             <div class="modal-actions">
-                <button id="edit-listing-btn" class="btn-warning-action">✏️ Edytuj ofertę</button>
-                <button id="delete-listing-btn" class="btn-danger-action">🗑️ Usuń ofertę</button>
+                <button type="button" id="btn-edit-offer" class="btn-warning-action">✏️ Edytuj treść ogłoszenia</button>
+                <button type="button" id="btn-delete-offer" class="btn-danger-action">🗑️ Usuń całą ofertę</button>
                 <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Zamknij</button>
             </div>
         </div>
