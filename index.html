@@ -34,26 +34,26 @@
                     </div>
 
                     <div class="input-group">
-                        <label>Kiedy sąsiad może odebrać produkt?</label>
-                        <input type="text" id="pickupTimes" placeholder="np. Poniedziałek 17-20, Sobota rano" required>
+                        <label>Kiedy można odebrać?</label>
+                        <input type="text" id="pickupTimes" placeholder="np. Jutro po 17:00" required>
                     </div>
 
                     <div class="input-group">
-                        <label>Opis i składniki</label>
+                        <label>Opis / Alergeny</label>
                         <textarea id="description" placeholder="Opisz swój produkt..." required></textarea>
                     </div>
 
                     <div class="input-group">
                         <label class="file-label">
-                            <span>📷 Dodaj zdjęcie (JPG, PNG, WebP)</span>
-                            <input type="file" id="productImage" accept="image/*, .jpg, .jpeg, .png, .webp" required>
+                            <span>📷 Wybierz zdjęcie</span>
+                            <input type="file" id="productImage" accept="image/*" required>
                         </label>
                     </div>
 
                     <div class="row">
                         <div class="input-group">
                             <label>Twoje Imię</label>
-                            <input type="text" id="sellerName" placeholder="Kasia z 4 piętra" required>
+                            <input type="text" id="sellerName" placeholder="Michał" required>
                         </div>
                         <div class="input-group">
                             <label>PIN (do usuwania)</label>
@@ -79,21 +79,21 @@
             <h3>Zarezerwuj produkt</h3>
             <p id="modal-product-info"></p>
             <div class="input-group">
-                <label>O której godzinie przyjdziesz?</label>
+                <label>Kiedy przyjdziesz po odbiór?</label>
                 <input type="datetime-local" id="buyerPickupTime" required>
             </div>
             <div class="modal-buttons">
-                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam rezerwację</button>
+                <button id="confirm-booking-btn" class="btn-primary">Potwierdzam</button>
                 <button id="close-modal-btn" class="btn-secondary">Anuluj</button>
             </div>
         </div>
     </div>
 
     <div id="success-modal" class="modal hidden">
-        <div class="modal-content glass-card success-view">
-            <h2>🎉 Gotowe!</h2>
-            <p>Twoja rezerwacja została zapisana.</p>
-            <button id="add-to-calendar-btn" class="btn-calendar">📅 Dodaj do Kalendarza Google</button>
+        <div class="modal-content glass-card">
+            <h2>🎉 Zarezerwowano!</h2>
+            <p>Dodaj termin do kalendarza:</p>
+            <button id="add-to-calendar-btn" class="btn-calendar">📅 Dodaj do Kalendarza</button>
             <button onclick="location.reload()" class="btn-secondary">Zamknij</button>
         </div>
     </div>
