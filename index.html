@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sąsiedzki Ryneczek</title>
+    
+    <link rel="stylesheet" href="./style.css">
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#1e3a8a">
+</head>
+<body>
+    <div class="container">
+        <header style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #1e3a8a; font-size: 2.2rem; margin-bottom: 5px;">Sąsiedzki Ryneczek</h1>
+            <p style="color: #64748b; margin-bottom: 20px;">Lokalne smakołyki prosto od sąsiadów</p>
+            
+            <button onclick="openAddModal()" class="add-btn">
+                + Wystaw coś pysznego
+            </button>
+        </header>
+
+        <div id="announcementsBoard" class="posts-container"></div>
+    </div>
+
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <button class="close-x" onclick="document.getElementById('addModal').classList.remove('active')">&times;</button>
+            <h2 style="color: #1e3a8a; margin-bottom: 20px;">Wystaw ogłoszenie</h2>
+            
+            <div class="form-group" style="background: #e0f2fe; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                <label style="color: #0369a1; font-weight: bold;">Ile różnych produktów chcesz wystawić?</label>
+                <input type="number" id="productsCount" value="1" min="1" max="10" onchange="generateProductForms()" style="border: 1px solid #bae6fd;">
+            </div>
+
+            <div id="dynamicProductsContainer"></div>
+
+            <hr style="border: none; border-top: 2px dashed #e2e8f0; margin: 20px 0;">
+
+            <div class="form-group">
+                <label>Twoje Imię (Wystawca)</label>
+                <input type="text" id="sellerName" placeholder="np. Kasia z 4 piętra">
+            </div>
+            <div class="form-group">
+                <label>Twój PIN (do usunięcia ogłoszenia)</label>
+                <input type="number" id="postPin" placeholder="4 cyfry">
+            </div>
+            <button id="saveAnnouncementBtn" class="confirm-btn" style="width: 100%; margin-top: 10px;">Opublikuj wszystko</button>
+        </div>
+    </div>
+
+    <div id="orderModal" class="modal">
+        <div class="modal-content">
+            <button class="close-x" onclick="document.getElementById('orderModal').classList.remove('active')">&times;</button>
+            <h2 id="modalTitle" style="color: #1e3a8a; margin-bottom: 20px;">Twoje Zamówienie</h2>
+            
+            <div id="productsSelectionList" style="margin-bottom: 15px;"></div>
+
+            <div class="info-box-green">
+                <p style="margin: 0; font-size: 1.1rem; color: #166534;">Suma do zapłaty: <strong id="totalCostValue" style="font-size: 1.4rem;">0.00 zł</strong></p>
+            </div>
+
+            <div class="form-group">
+                <label>Twoje Imię</label>
+                <input type="text" id="customerName" placeholder="np. Tomek">
+            </div>
+            <div class="form-group">
+                <label>Adres odbioru / nr domu</label>
+                <input type="text" id="customerAddress" placeholder="np. Słowika 24">
+            </div>
+            <div class="form-group">
+                <label>Twój numer telefonu (dla sprzedawcy)</label>
+                <input type="text" id="customerPhone" placeholder="np. 500 600 700">
+            </div>
+            
+            <button id="confirmOrderBtn" class="confirm-btn" style="width: 100%; margin-top: 10px;">Złóż zamówienie</button>
+        </div>
+    </div>
+
+    <div id="successModal" class="modal">
+        <div class="modal-content" style="text-align: center;">
+            <button class="close-x" onclick="document.getElementById('successModal').classList.remove('active')">&times;</button>
+            <h2 style="color: #059669; margin-bottom: 10px;">Mniam! Zamówienie przyjęte!</h2>
+            <p style="color: #64748b; margin-top: 10px;">Przygotuj do zapłaty (gotówka/BLIK):</p>
+            <p id="successTotal" style="color: #1a2a47; margin: 10px 0 25px 0; font-size: 2.5rem; font-weight: bold;"></p>
+            
+            <button class="primary-btn" style="width: 100%; background: #f1f5f9; color: #1e3a8a; border: 2px solid #e2e8f0;" onclick="document.getElementById('successModal').classList.remove('active')">Zamknij</button>
+        </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => {
+                    console.log('Rejestracja SW nie powiodła się: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
