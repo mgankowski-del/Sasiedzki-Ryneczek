@@ -2,7 +2,7 @@
   "name": "Odbiór Produktów",
   "short_name": "Odbiór",
   "description": "Rezerwacja odbioru produktów",
-  "start_url": "/index.html",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#1e3a8a",
