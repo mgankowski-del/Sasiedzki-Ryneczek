@@ -56,7 +56,7 @@ const getRem = (name, total, res, ignoreIdx = null) => {
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-// --- FORMULARZ PRODUKTÓW ---
+// --- FORMULARZ PRODUKTÓW Z OPCJĄ DZIELENIA ---
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
@@ -70,9 +70,13 @@ const createProductFields = (data = {}) => {
             </div>
         </div>
         <div class="form-grid">
-            <div class="input-group"><label>Łączna ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
-            <div class="input-group"><label>Minimum zamówienia</label>
-                <select class="p-step"><option value="0.25" ${initialStep==0.25?'selected':''}>0.25</option><option value="0.5" ${initialStep==0.5?'selected':''}>0.5</option><option value="0.75" ${initialStep==0.75?'selected':''}>0.75</option><option value="1" ${initialStep==1?'selected':''}>1.0</option></select>
+            <div class="input-group"><label>Łączna ilość (pula)</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+            <div class="input-group"><label>Czy można dzielić?</label>
+                <select class="p-step">
+                    <option value="1" ${initialStep==1?'selected':''}>Tylko w całości (1, 2, 3...)</option>
+                    <option value="0.5" ${initialStep==0.5?'selected':''}>Na połówki (0.5, 1, 1.5...)</option>
+                    <option value="0.25" ${initialStep==0.25?'selected':''}>Na ćwiartki (0.25, 0.5...)</option>
+                </select>
             </div>
         </div>
         <input type="file" class="p-file" accept="image/*" style="margin-top:10px; border:none; background:transparent">
@@ -144,7 +148,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
             </div>
             ${d.items.map(it => {
                 const rem = getRem(it.name, it.totalQty, d.reservations);
-                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/60?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${rem} ${it.unit}</small></div></div>`;
+                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/60?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
             }).join('')}
             <div class="card-footer">
                 <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów / Zmień</button>
@@ -155,7 +159,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     });
 });
 
-// --- OKNO ZAMÓWIENIA ---
+// --- OKNO ZAMÓWIENIA Z BLOKADĄ STANU I UŁAMKAMI ---
 window.openOrderModal = async (id, editIdx = null) => {
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
@@ -166,11 +170,11 @@ window.openOrderModal = async (id, editIdx = null) => {
         const startVal = (editingResIndex !== null) ? (d.reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
         container.innerHTML += `
             <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                <div style="flex:1"><b style="display:block">${it.name}</b><small style="color:var(--accent)">Dostępne: ${rem}</small></div>
+                <div style="flex:1"><b style="display:block">${it.name}</b><small style="color:var(--accent)">Dostępne: ${Number(rem.toFixed(2))}</small></div>
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.nextElementSibling; s.innerText = Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2); window.updateSum();">-</button>
-                    <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="font-weight:bold; min-width:40px; text-align:center">${parseFloat(startVal).toFixed(2)}</span>
-                    <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=(parseFloat(s.innerText)+${it.step}).toFixed(2);window.updateSum();}else{alert('Brak!');}">+</button>
+                    <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.nextElementSibling; s.innerText = Number(Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2)); window.updateSum();">-</button>
+                    <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="font-weight:bold; min-width:40px; text-align:center">${Number(startVal).toString()}</span>
+                    <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=Number((parseFloat(s.innerText)+${it.step}).toFixed(2));window.updateSum();}else{alert('Brak wystarczającej ilości w puli!');}">+</button>
                 </div>
             </div>`;
     });
@@ -256,7 +260,6 @@ const renderSellerView = (type) => {
                 const prod = d.items.find(pi => pi.name === i.name); const st = prod ? i.qty * prod.price : 0; pTotal += st;
                 return `<div class="res-item-line"><span>${i.name} (x${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
             }).join('');
-            // TUTAJ SPRZEDAWCA WIDZI NUMER KUPUJĄCEGO
             container.innerHTML += `<div class="res-card-ui">
                 <div class="res-card-header">
                     <div>
