@@ -22,7 +22,7 @@ let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- POWIADOMIENIA (Wywoływane tylko po kliknięciu przez użytkownika) ---
+// --- POWIADOMIENIA ---
 async function requestPermission() {
     try {
         const permission = await Notification.requestPermission();
@@ -60,7 +60,7 @@ const getRem = (name, total, res, ignoreIdx = null) => {
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-// --- FORMULARZ PRODUKTÓW Z OPCJĄ DZIELENIA ---
+// --- FORMULARZ PRODUKTÓW ---
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
@@ -90,9 +90,8 @@ const createProductFields = (data = {}) => {
 
 document.addEventListener('DOMContentLoaded', () => {
     cleanupExpired();
-    // Powiadomienia przeniesione do zdarzeń "onclick"
     document.getElementById('btn-open-add').onclick = () => {
-        requestPermission(); // Zapyta o zgodę po kliknięciu
+        requestPermission();
         isEditingOffer = false;
         document.getElementById('modal-title').innerText = "Nowa oferta";
         document.getElementById('listing-form').reset();
@@ -164,13 +163,16 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     });
 });
 
-// --- OKNO ZAMÓWIENIA Z BLOKADĄ STANU I UŁAMKAMI ---
+// --- OKNO ZAMÓWIENIA ---
 window.openOrderModal = async (id, editIdx = null) => {
-    requestPermission(); // Zapyta o zgodę po kliknięciu "Zamów"
+    requestPermission();
     
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
+    
+    // Wstawienie informacji o godzinach odbioru
+    document.getElementById('modal-pickup-info').innerText = `(⏰ Możliwe godziny: ${d.pickupTimes})`;
     
     d.items.forEach((it) => {
         const rem = getRem(it.name, it.totalQty, d.reservations, editingResIndex);
@@ -264,60 +266,4 @@ const renderSellerView = (type) => {
         d.reservations.forEach((r, idx) => {
             let pTotal = 0;
             const itemsRows = r.items.map(i => {
-                const prod = d.items.find(pi => pi.name === i.name); const st = prod ? i.qty * prod.price : 0; pTotal += st;
-                return `<div class="res-item-line"><span>${i.name} (x${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
-            }).join('');
-            container.innerHTML += `<div class="res-card-ui">
-                <div class="res-card-header">
-                    <div>
-                        <b style="color:var(--accent); display:block;">👤 ${r.buyerName}</b>
-                        <small style="color:#94a3b8">📞 ${r.buyerPhone || 'Brak numeru'}</small>
-                    </div>
-                    <small>⏰ ${r.time}</small>
-                </div>
-                ${itemsRows}<div class="res-total-highlight">Do zapłaty: ${pTotal.toFixed(2)} zł</div>
-                <button onclick="window.openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; font-size:0.8rem; margin-top:10px">✏️ Edytuj zamówienie sąsiada</button>
-            </div>`;
-        });
-    } else {
-        d.items.forEach(product => {
-            let pGrand = 0; let tSold = 0;
-            const bRows = d.reservations.map(r => {
-                const f = r.items.find(i => i.name === product.name);
-                if (f) { pGrand += f.qty * product.price; tSold += f.qty; return `<div class="res-item-line"><span>👤 ${r.buyerName}</span> <b>${f.qty} ${product.unit}</b></div>`; }
-                return '';
-            }).join('');
-            container.innerHTML += `<div class="res-card-ui">
-                <div class="res-card-header"><b style="color:#a5b4fc">📦 ${product.name}</b><small>Sprzedano: ${tSold}/${product.totalQty}</small></div>
-                ${bRows || '<small style="opacity:0.5">Brak zamówień</small>'}
-                <div class="res-total-highlight">Suma: ${pGrand.toFixed(2)} zł</div>
-            </div>`;
-        });
-    }
-};
-
-document.getElementById('view-by-person').onclick = () => renderSellerView('person');
-document.getElementById('view-by-product').onclick = () => renderSellerView('product');
-
-document.getElementById('btn-edit-offer').onclick = () => {
-    isEditingOffer = true; const d = cachedListingData;
-    document.getElementById('modal-title').innerText = "Modyfikuj ofertę";
-    document.getElementById('sellerName').value = d.sellerName;
-    document.getElementById('sellerPhone').value = d.sellerPhone || '';
-    document.getElementById('pickupAddress').value = d.address;
-    document.getElementById('pickupTimes').value = d.pickupTimes;
-    document.getElementById('expiryDate').value = d.expiryDate || '';
-    document.getElementById('pin').value = d.pin;
-    document.getElementById('products-to-add').innerHTML = '';
-    d.items.forEach(it => {
-        const row = createProductFields(it);
-        row.dataset.oldUrl = it.imageUrl;
-        document.getElementById('products-to-add').appendChild(row);
-    });
-    document.getElementById('seller-modal').classList.add('hidden');
-    document.getElementById('add-listing-modal').classList.remove('hidden');
-};
-
-document.getElementById('btn-delete-offer').onclick = async () => {
-    if(confirm("Usunąć całe ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); }
-};
+                const prod = d.

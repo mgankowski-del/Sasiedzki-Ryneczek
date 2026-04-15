@@ -58,7 +58,10 @@
                 <div class="input-group"><label>Twój numer telefonu</label><input type="tel" id="buyerPhone" placeholder="Tylko dla sprzedawcy" required></div>
             </div>
             <div class="form-grid">
-                <div class="input-group"><label>Kiedy odbierzesz?</label><input type="text" id="buyerPickupTime" required></div>
+                <div class="input-group">
+                    <label>Kiedy odbierzesz? <span id="modal-pickup-info" style="color: var(--accent); font-size: 0.8rem; display: block; margin-top: 3px; font-weight: bold;"></span></label>
+                    <input type="text" id="buyerPickupTime" required>
+                </div>
                 <div class="input-group"><label>PIN (4 cyfry do edycji)</label><input type="text" id="buyerPin" maxlength="4" required></div>
             </div>
             <div class="modal-actions">
