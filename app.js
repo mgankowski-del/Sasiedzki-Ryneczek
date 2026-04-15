@@ -22,12 +22,16 @@ let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- POWIADOMIENIA ---
+// --- POWIADOMIENIA (Wywoływane tylko po kliknięciu przez użytkownika) ---
 async function requestPermission() {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-        const token = await getToken(messaging, { vapidKey: 'nP5epfMI7IJkkq-8zvos2dLjYoVXJjYF9YwLsQ7knLk' });
-        if (token) localStorage.setItem('ryneczek_push_token', token);
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            const token = await getToken(messaging, { vapidKey: 'nP5epfMI7IJkkq-8zvos2dLjYoVXJjYF9YwLsQ7knLk' });
+            if (token) localStorage.setItem('ryneczek_push_token', token);
+        }
+    } catch (error) {
+        console.error("Błąd podczas prośby o powiadomienia:", error);
     }
 }
 
@@ -86,8 +90,9 @@ const createProductFields = (data = {}) => {
 
 document.addEventListener('DOMContentLoaded', () => {
     cleanupExpired();
-    requestPermission();
+    // Powiadomienia przeniesione do zdarzeń "onclick"
     document.getElementById('btn-open-add').onclick = () => {
+        requestPermission(); // Zapyta o zgodę po kliknięciu
         isEditingOffer = false;
         document.getElementById('modal-title').innerText = "Nowa oferta";
         document.getElementById('listing-form').reset();
@@ -161,6 +166,8 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
 
 // --- OKNO ZAMÓWIENIA Z BLOKADĄ STANU I UŁAMKAMI ---
 window.openOrderModal = async (id, editIdx = null) => {
+    requestPermission(); // Zapyta o zgodę po kliknięciu "Zamów"
+    
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
