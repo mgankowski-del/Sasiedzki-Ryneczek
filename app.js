@@ -15,15 +15,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
-const messaging = getMessaging(app);
+let messaging = null;
+
+// Zabezpieczenie przed brakiem wsparcia powiadomień w przeglądarce
+if ('Notification' in window && 'serviceWorker' in navigator) {
+    try { messaging = getMessaging(app); } catch (e) { console.log("Messaging wyłączone"); }
+}
 
 let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- POWIADOMIENIA ---
+// --- POWIADOMIENIA (BEZPIECZNE) ---
 async function requestPermission() {
+    if (!messaging || !('Notification' in window)) return; // Jeśli przeglądarka nie wspiera, pomiń
     try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
@@ -31,30 +37,38 @@ async function requestPermission() {
             if (token) localStorage.setItem('ryneczek_push_token', token);
         }
     } catch (error) {
-        console.error("Błąd podczas prośby o powiadomienia:", error);
+        console.error("Błąd powiadomień (zignorowany):", error);
     }
 }
 
-// --- AUTOSPRZĄTANIE ---
+// --- AUTOSPRZĄTANIE (BEZPIECZNE) ---
 const cleanupExpired = async () => {
-    const now = new Date();
-    const snap = await getDocs(collection(db, "listings"));
-    snap.forEach(async (docSnap) => {
-        const d = docSnap.data();
-        if (d.expiryDate) {
-            const exp = new Date(d.expiryDate);
-            if (now > new Date(exp.getTime() + 24 * 60 * 60 * 1000)) await deleteDoc(doc(db, "listings", docSnap.id));
-        }
-    });
+    try {
+        const now = new Date();
+        const snap = await getDocs(collection(db, "listings"));
+        snap.forEach(async (docSnap) => {
+            const d = docSnap.data();
+            if (d.expiryDate) {
+                const exp = new Date(d.expiryDate);
+                if (now > new Date(exp.getTime() + 24 * 60 * 60 * 1000)) await deleteDoc(doc(db, "listings", docSnap.id));
+            }
+        });
+    } catch (error) {
+        console.error("Błąd czyszczenia bazy:", error);
+    }
 };
 
-const getRem = (name, total, res, ignoreIdx = null) => {
+// --- LOGIKA UŁAMKÓW I STANÓW (Zabezpieczona przed starymi danymi) ---
+const getRem = (name, total, res = [], ignoreIdx = null) => {
     let reserved = 0;
-    res.forEach((r, idx) => { 
-        if (ignoreIdx !== null && idx === ignoreIdx) return; 
-        const item = r.items.find(i => i.name === name); 
-        if (item) reserved += parseFloat(item.qty); 
-    });
+    if (Array.isArray(res)) {
+        res.forEach((r, idx) => { 
+            if (ignoreIdx !== null && idx === ignoreIdx) return; 
+            if (!r.items) return;
+            const item = r.items.find(i => i.name === name); 
+            if (item) reserved += parseFloat(item.qty); 
+        });
+    }
     return Math.max(0, total - reserved);
 };
 
@@ -134,15 +148,20 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     location.reload();
 };
 
-// --- ŁADOWANIE ---
+// --- ŁADOWANIE OGŁOSZEŃ Z ZABEZPIECZENIEM ---
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
     cont.innerHTML = '';
     const now = new Date();
+    
+    let hasValidOffers = false;
+
     snap.forEach(docSnap => {
         const d = docSnap.data();
         if (d.expiryDate && now > new Date(d.expiryDate)) return;
+        
+        hasValidOffers = true;
         const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
             <div class="listing-header">
@@ -150,8 +169,8 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
                 <p>📍 ${d.address} | 📞 ${d.sellerPhone || 'Brak telefonu'}</p>
                 <p style="margin-top: 8px; color: var(--accent); font-weight: bold; font-size: 0.95rem;">⏰ Odbiór: ${d.pickupTimes}</p>
             </div>
-            ${d.items.map(it => {
-                const rem = getRem(it.name, it.totalQty, d.reservations);
+            ${(d.items || []).map(it => {
+                const rem = getRem(it.name, it.totalQty, d.reservations || []);
                 return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/60?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
             }).join('')}
             <div class="card-footer">
@@ -161,6 +180,10 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         `;
         cont.appendChild(card);
     });
+
+    if (!hasValidOffers) {
+        cont.innerHTML = '<p class="status-msg">Brak ofert na Ryneczku. Dodaj pierwszą!</p>';
+    }
 });
 
 // --- OKNO ZAMÓWIENIA ---
@@ -171,12 +194,14 @@ window.openOrderModal = async (id, editIdx = null) => {
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
     
-    // Wstawienie informacji o godzinach odbioru
     document.getElementById('modal-pickup-info').innerText = `(⏰ Możliwe godziny: ${d.pickupTimes})`;
     
-    d.items.forEach((it) => {
-        const rem = getRem(it.name, it.totalQty, d.reservations, editingResIndex);
-        const startVal = (editingResIndex !== null) ? (d.reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
+    (d.items || []).forEach((it) => {
+        const reservations = d.reservations || [];
+        const rem = getRem(it.name, it.totalQty, reservations, editingResIndex);
+        const startVal = (editingResIndex !== null && reservations[editIdx] && reservations[editIdx].items) 
+            ? (reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
+            
         container.innerHTML += `
             <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
                 <div style="flex:1"><b style="display:block">${it.name}</b><small style="color:var(--accent)">Dostępne: ${Number(rem.toFixed(2))}</small></div>
@@ -194,10 +219,11 @@ window.openOrderModal = async (id, editIdx = null) => {
         document.getElementById('buyerPin').value = localStorage.getItem('ryneczek_pin') || '';
         if(document.getElementById('buyerName').value) lookUpOrder();
     } else {
-        document.getElementById('buyerName').value = d.reservations[editIdx].buyerName;
-        document.getElementById('buyerPhone').value = d.reservations[editIdx].buyerPhone || '';
-        document.getElementById('buyerPin').value = d.reservations[editIdx].buyerPin;
-        document.getElementById('buyerPickupTime').value = d.reservations[editIdx].time;
+        const resData = d.reservations[editIdx];
+        document.getElementById('buyerName').value = resData.buyerName;
+        document.getElementById('buyerPhone').value = resData.buyerPhone || '';
+        document.getElementById('buyerPin').value = resData.buyerPin;
+        document.getElementById('buyerPickupTime').value = resData.time || '';
     }
     document.getElementById('reservation-modal').classList.remove('hidden'); window.updateSum();
 };
@@ -208,6 +234,7 @@ window.updateSum = () => {
 };
 
 const lookUpOrder = () => {
+    if (!cachedListingData || !cachedListingData.reservations) return;
     const name = document.getElementById('buyerName').value.trim().toLowerCase();
     const pin = document.getElementById('buyerPin').value.trim();
     if (name.length > 2 && pin.length === 4) {
@@ -263,7 +290,63 @@ const renderSellerView = (type) => {
     document.getElementById('view-by-product').classList.toggle('active', type === 'product');
 
     if (type === 'person') {
-        d.reservations.forEach((r, idx) => {
+        (d.reservations || []).forEach((r, idx) => {
             let pTotal = 0;
-            const itemsRows = r.items.map(i => {
-                const prod = d.
+            const itemsRows = (r.items || []).map(i => {
+                const prod = (d.items || []).find(pi => pi.name === i.name); const st = prod ? i.qty * prod.price : 0; pTotal += st;
+                return `<div class="res-item-line"><span>${i.name} (x${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
+            }).join('');
+            container.innerHTML += `<div class="res-card-ui">
+                <div class="res-card-header">
+                    <div>
+                        <b style="color:var(--accent); display:block;">👤 ${r.buyerName}</b>
+                        <small style="color:#94a3b8">📞 ${r.buyerPhone || 'Brak numeru'}</small>
+                    </div>
+                    <small>⏰ ${r.time || 'Brak'}</small>
+                </div>
+                ${itemsRows}<div class="res-total-highlight">Do zapłaty: ${pTotal.toFixed(2)} zł</div>
+                <button onclick="window.openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; font-size:0.8rem; margin-top:10px">✏️ Edytuj zamówienie sąsiada</button>
+            </div>`;
+        });
+    } else {
+        (d.items || []).forEach(product => {
+            let pGrand = 0; let tSold = 0;
+            const bRows = (d.reservations || []).map(r => {
+                const f = (r.items || []).find(i => i.name === product.name);
+                if (f) { pGrand += f.qty * product.price; tSold += f.qty; return `<div class="res-item-line"><span>👤 ${r.buyerName}</span> <b>${f.qty} ${product.unit}</b></div>`; }
+                return '';
+            }).join('');
+            container.innerHTML += `<div class="res-card-ui">
+                <div class="res-card-header"><b style="color:#a5b4fc">📦 ${product.name}</b><small>Sprzedano: ${tSold}/${product.totalQty}</small></div>
+                ${bRows || '<small style="opacity:0.5">Brak zamówień</small>'}
+                <div class="res-total-highlight">Suma: ${pGrand.toFixed(2)} zł</div>
+            </div>`;
+        });
+    }
+};
+
+document.getElementById('view-by-person').onclick = () => renderSellerView('person');
+document.getElementById('view-by-product').onclick = () => renderSellerView('product');
+
+document.getElementById('btn-edit-offer').onclick = () => {
+    isEditingOffer = true; const d = cachedListingData;
+    document.getElementById('modal-title').innerText = "Modyfikuj ofertę";
+    document.getElementById('sellerName').value = d.sellerName;
+    document.getElementById('sellerPhone').value = d.sellerPhone || '';
+    document.getElementById('pickupAddress').value = d.address;
+    document.getElementById('pickupTimes').value = d.pickupTimes;
+    document.getElementById('expiryDate').value = d.expiryDate || '';
+    document.getElementById('pin').value = d.pin;
+    document.getElementById('products-to-add').innerHTML = '';
+    (d.items || []).forEach(it => {
+        const row = createProductFields(it);
+        row.dataset.oldUrl = it.imageUrl;
+        document.getElementById('products-to-add').appendChild(row);
+    });
+    document.getElementById('seller-modal').classList.add('hidden');
+    document.getElementById('add-listing-modal').classList.remove('hidden');
+};
+
+document.getElementById('btn-delete-offer').onclick = async () => {
+    if(confirm("Usunąć całe ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); }
+};
