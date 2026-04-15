@@ -140,7 +140,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
             <div class="listing-header">
                 <h3>Odbiór u: ${d.sellerName}</h3>
                 <p>📍 ${d.address} | 📞 ${d.sellerPhone || 'Brak telefonu'}</p>
-                ${d.expiryDate ? `<small style="color:#ef4444; font-weight:bold">Ważne do: ${new Date(d.expiryDate).toLocaleString()}</small>` : ''}
+                <p style="margin-top: 8px; color: var(--accent); font-weight: bold; font-size: 0.95rem;">⏰ Odbiór: ${d.pickupTimes}</p>
             </div>
             ${d.items.map(it => {
                 const rem = getRem(it.name, it.totalQty, d.reservations);
