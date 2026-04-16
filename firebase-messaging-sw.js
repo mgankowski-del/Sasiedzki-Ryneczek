@@ -12,11 +12,14 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Obsługa powiadomień, gdy aplikacja jest w tle (zamknięta)
 messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: 'https://mgankowski-del.github.io/Sasiedzki-Ryneczek/icon-192.png'
-  };
-  self.registration.showNotification(notificationTitle, notificationOptions);
+    console.log('[sw.js] Odebrano wiadomość w tle: ', payload);
+    const notificationTitle = payload.notification.title || "Nowe zamówienie!";
+    const notificationOptions = {
+        body: payload.notification.body || "Ktoś zarezerwował Twój produkt.",
+        icon: '/apple-touch-icon.png' // Twoje logo
+    };
+
+    self.registration.showNotification(notificationTitle, notificationOptions);
 });
