@@ -39,7 +39,7 @@ window.setupNotifications = async () => {
     
     try {
         // 1. Rejestracja SW (jeśli jeszcze nie ma)
-        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js?v=1');
         console.log('SW zarejestrowany');
 
         // 2. Prośba o uprawnienia (standardowe okno iOS)
