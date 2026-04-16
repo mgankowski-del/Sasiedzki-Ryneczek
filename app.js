@@ -31,31 +31,40 @@ window.closeModals = () => {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 };
 
-// --- IZOLOWANA FUNKCJA POWIADOMIEŃ ---
+// --- Uproszczona, standardowa funkcja powiadomień ---
 window.setupNotifications = async () => {
-    if (!messaging) return alert("Twoja przeglądarka nie obsługuje powiadomień.");
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        return alert("Twoja przeglądarka nie obsługuje powiadomień Push.");
+    }
     
     try {
+        // 1. Rejestracja SW (jeśli jeszcze nie ma)
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-        await navigator.serviceWorker.ready;
+        console.log('SW zarejestrowany');
+
+        // 2. Prośba o uprawnienia (standardowe okno iOS)
         const permission = await Notification.requestPermission();
-        
-        if (permission === 'granted') {
-            const token = await getToken(messaging, { 
-                vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
-                serviceWorkerRegistration: registration 
-            });
-            if (token) {
-                localStorage.setItem('ryneczek_push_token', token);
-                alert("Powiadomienia włączone pomyślnie!");
-                console.log("Token:", token);
-            }
+        if (permission !== 'granted') {
+            return alert("Musisz zezwolić na powiadomienia w ustawieniach.");
+        }
+
+        // 3. Pobranie tokena Firebase - wersja "Pure String"
+        // iOS 17.4+ często lepiej radzi sobie z czystym tekstem niż z Uint8Array
+        const token = await getToken(messaging, { 
+            vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE'
+            // Usunąłem jawne podawanie registration, Firebase sam je znajdzie
+        });
+
+        if (token) {
+            localStorage.setItem('ryneczek_push_token', token);
+            alert("✅ Sukces! Powiadomienia aktywne.");
+            console.log("Token:", token);
         } else {
-            alert("Brak zgody na powiadomienia.");
+            alert("Nie udało się wygenerować tokena. Spróbuj odświeżyć stronę.");
         }
     } catch (error) {
-        console.error("Błąd powiadomień:", error);
-        alert("Nie udało się skonfigurować powiadomień, ale możesz nadal korzystać z aplikacji.");
+        console.error("Błąd szczegółowy:", error);
+        alert("Błąd: " + error.message);
     }
 };
 
