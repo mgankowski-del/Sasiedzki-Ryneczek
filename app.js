@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.app.js"; // Poprawiony import dla storage
-import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyD_cuGXokb55W6W4aB-QkV0c_jAqXkJQgk",
@@ -15,148 +14,180 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
-let messaging = null;
-try { messaging = getMessaging(app); } catch (e) {}
 
-window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+let currentEditId = null;
+let cachedListingData = null;
 
-// --- RĘCZNE WYMUSZENIE TOKENA Z SUROWYM KLUCZEM ---
-window.activatePush = async () => {
-    const btn = event.target;
-    btn.innerText = "Łączę...";
-    try {
-        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-        await navigator.serviceWorker.ready;
-        const permission = await Notification.requestPermission();
-        
-        if (permission === 'granted') {
-            // SUROWY KLUCZ VAPID (Twoje BEprJ... zamienione na bajty)
-            // To eliminuje błąd "invalid characters" oraz "P-256"
-            const rawKey = new Uint8Array([
-                4, 66, 110, 34, 73, 82, 112, 86, 119, 110, 107, 50, 66, 76, 85, 79, 49, 78, 79, 104, 
-                90, 104, 115, 67, 85, 48, 97, 51, 116, 49, 112, 84, 120, 115, 49, 107, 50, 70, 52, 
-                85, 65, 84, 110, 112, 88, 86, 89, 55, 107, 87, 87, 79, 78, 51, 84, 81, 68, 90, 45, 
-                114, 53, 105, 81, 66, 102, 110, 109, 95, 88, 107, 66, 85, 72, 80, 67, 87, 71, 66, 
-                84, 66, 117, 86, 52, 72, 69
-            ]);
-
-            const token = await getToken(messaging, { 
-                vapidKey: rawKey, 
-                serviceWorkerRegistration: registration 
-            });
-
-            if (token) {
-                localStorage.setItem('ryneczek_push_token', token);
-                btn.innerText = "✅ Powiadomienia aktywne";
-                btn.style.backgroundColor = "#4caf50";
-                return;
-            }
-        }
-        alert("Zgoda jest, ale system nie wydał tokena. Spróbuj odświeżyć.");
-    } catch (e) { 
-        alert("Błąd: " + e.message); 
-        console.error(e);
-    }
-    btn.innerText = "Błąd. Spróbuj ponownie";
+// Rejestracja funkcji w window, aby przyciski w HTML działały
+window.closeModals = () => {
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 };
 
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     div.innerHTML = `
-        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
+        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" placeholder="Np. Jajka wiejskie" required></div>
         <div class="form-grid">
-            <div class="input-group"><label>Cena</label><input type="number" class="p-price" step="0.01" required></div>
-            <div class="input-group"><label>Jedn.</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
+            <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" required></div>
+            <div class="input-group"><label>Jednostka</label>
+                <select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option><option value="g">g</option></select>
+            </div>
         </div>
         <div class="form-grid">
-            <div class="input-group"><label>Pula</label><input type="number" class="p-total" step="0.01" required></div>
-            <div class="input-group"><label>Krok</label><select class="p-step"><option value="1">1</option><option value="0.5">0.5</option></select></div>
+            <div class="input-group"><label>Łączna ilość (pula)</label><input type="number" class="p-total" step="0.01" required></div>
+            <div class="input-group"><label>Krok zamawiania</label>
+                <select class="p-step"><option value="1">1</option><option value="0.5">0.5</option><option value="0.25">0.25</option><option value="100">100 (g)</option></select>
+            </div>
         </div>
-        <input type="file" class="p-file" accept="image/*">
+        <input type="file" class="p-file" accept="image/*" style="margin-top:10px;">
     `;
     return div;
 };
 
+// --- ŁADOWANIE OFERT ---
 document.addEventListener('DOMContentLoaded', () => {
-    const btnOpenAdd = document.getElementById('btn-open-add');
-    if (btnOpenAdd) {
-        btnOpenAdd.onclick = () => {
-            const form = document.getElementById('listing-form');
-            if (form) form.reset();
-            const productCont = document.getElementById('products-to-add');
-            if (productCont) {
-                productCont.innerHTML = '';
-                productCont.appendChild(createProductFields());
-                
-                const pushControl = document.createElement('div');
-                pushControl.innerHTML = `<button type="button" onclick="window.activatePush()" style="width:100%; margin-bottom:15px; padding:12px; background:#ff9800; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">🔔 WŁĄCZ POWIADOMIENIA (WYMAGANE)</button>`;
-                productCont.prepend(pushControl);
-            }
-            document.getElementById('add-listing-modal')?.classList.remove('hidden');
-        };
-    }
+    const listingsCont = document.getElementById('listings-container');
+    
+    onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
+        listingsCont.innerHTML = '';
+        snap.forEach(docSnap => {
+            const d = docSnap.data();
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            
+            let productsHtml = (d.items || []).map(it => `
+                <div class="product-item-list">
+                    <img src="${it.imageUrl || 'https://via.placeholder.com/50'}" class="thumb">
+                    <div>
+                        <b>${it.name}</b><br>
+                        <small>${it.price} zł / ${it.unit}</small>
+                    </div>
+                </div>
+            `).join('');
 
-    const cont = document.getElementById('listings-container');
-    if (cont) {
-        onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
-            cont.innerHTML = '';
-            snap.forEach(docSnap => {
-                const d = docSnap.data();
-                const card = document.createElement('div');
-                card.className = 'product-card';
-                card.innerHTML = `<div class="listing-header"><h3>${d.sellerName}</h3><p>📍 ${d.address}</p></div>`;
-                cont.appendChild(card);
-            });
+            card.innerHTML = `
+                <div class="listing-header">
+                    <h3>Odbiór u: ${d.sellerName}</h3>
+                    <p>📍 ${d.address} | 📞 ${d.sellerPhone}</p>
+                    <p>⏰ ${d.pickupTimes}</p>
+                </div>
+                ${productsHtml}
+                <div class="card-footer">
+                    <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
+                    <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
+                </div>
+            `;
+            listingsCont.appendChild(card);
         });
-    }
+    });
+
+    // Przycisk otwierania modala
+    document.getElementById('btn-open-add').onclick = () => {
+        document.getElementById('listing-form').reset();
+        document.getElementById('products-to-add').innerHTML = '';
+        document.getElementById('products-to-add').appendChild(createProductFields());
+        document.getElementById('add-listing-modal').classList.remove('hidden');
+    };
+
+    document.getElementById('add-more-items').onclick = () => {
+        document.getElementById('products-to-add').appendChild(createProductFields());
+    };
 });
 
+// --- ZAPIS OFERTY ---
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.innerText = "Publikuję...";
 
-    try {
-        const products = [];
-        for (const div of document.querySelectorAll('.product-form-box')) {
-            const file = div.querySelector('.p-file')?.files[0];
-            let imageUrl = "";
-            if (file) {
-                const sRef = ref(storage, `products/${Date.now()}_${file.name}`);
-                await uploadBytes(sRef, file);
-                imageUrl = await getDownloadURL(sRef);
-            }
-            if (div.querySelector('.p-name')) {
-                products.push({
-                    name: div.querySelector('.p-name').value,
-                    price: parseFloat(div.querySelector('.p-price').value),
-                    unit: div.querySelector('.p-unit').value,
-                    totalQty: parseFloat(div.querySelector('.p-total').value),
-                    step: parseFloat(div.querySelector('.p-step').value),
-                    imageUrl: imageUrl
-                });
-            }
+    const products = [];
+    for (const div of document.querySelectorAll('.product-form-box')) {
+        const file = div.querySelector('.p-file').files[0];
+        let imageUrl = "";
+        if (file) {
+            const sRef = ref(storage, `products/${Date.now()}_${file.name}`);
+            await uploadBytes(sRef, file);
+            imageUrl = await getDownloadURL(sRef);
         }
-
-        await addDoc(collection(db, "listings"), {
-            sellerName: document.getElementById('sellerName').value,
-            sellerPhone: document.getElementById('sellerPhone').value,
-            sellerToken: localStorage.getItem('ryneczek_push_token') || "",
-            address: document.getElementById('pickupAddress').value,
-            pickupTimes: document.getElementById('pickupTimes').value,
-            expiryDate: document.getElementById('expiryDate').value,
-            pin: document.getElementById('pin').value,
-            items: products,
-            createdAt: new Date(),
-            reservations: []
+        products.push({
+            name: div.querySelector('.p-name').value,
+            price: parseFloat(div.querySelector('.p-price').value),
+            unit: div.querySelector('.p-unit').value,
+            totalQty: parseFloat(div.querySelector('.p-total').value),
+            step: parseFloat(div.querySelector('.p-step').value),
+            imageUrl
         });
+    }
 
-        location.reload();
-    } catch (err) {
-        alert("Błąd: " + err.message);
-        btn.disabled = false;
-        btn.innerText = "Opublikuj";
+    await addDoc(collection(db, "listings"), {
+        sellerName: document.getElementById('sellerName').value,
+        sellerPhone: document.getElementById('sellerPhone').value,
+        address: document.getElementById('pickupAddress').value,
+        pickupTimes: document.getElementById('pickupTimes').value,
+        expiryDate: document.getElementById('expiryDate').value,
+        pin: document.getElementById('pin').value,
+        items: products,
+        createdAt: new Date(),
+        reservations: []
+    });
+
+    location.reload();
+};
+
+// --- MODAL ZAMÓWIENIA ---
+window.openOrderModal = async (id) => {
+    currentEditId = id;
+    const snap = await getDoc(doc(db, "listings", id));
+    const d = snap.data();
+    cachedListingData = d;
+
+    const container = document.getElementById('modal-order-items');
+    container.innerHTML = '';
+
+    d.items.forEach(it => {
+        container.innerHTML += `
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center;">
+                <span>${it.name} (${it.price} zł)</span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <button type="button" onclick="const s=this.nextElementSibling; s.innerText=Math.max(0, parseFloat(s.innerText)-${it.step})">-</button>
+                    <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}">0</span>
+                    <button type="button" onclick="const s=this.previousElementSibling; s.innerText=parseFloat(s.innerText)+${it.step}">+</button>
+                </div>
+            </div>`;
+    });
+    document.getElementById('reservation-modal').classList.remove('hidden');
+};
+
+document.getElementById('confirm-booking-btn').onclick = async () => {
+    const items = [];
+    document.querySelectorAll('.order-qty-val').forEach(span => {
+        const q = parseFloat(span.innerText);
+        if (q > 0) items.push({ name: span.dataset.name, qty: q });
+    });
+
+    if (items.length === 0) return alert("Wybierz produkty!");
+
+    const refL = doc(db, "listings", currentEditId);
+    let res = cachedListingData.reservations || [];
+    res.push({
+        buyerName: document.getElementById('buyerName').value,
+        buyerPhone: document.getElementById('buyerPhone').value,
+        items,
+        time: document.getElementById('buyerPickupTime').value
+    });
+
+    await updateDoc(refL, { reservations: res });
+    location.reload();
+};
+
+// --- AUTORYZACJA SPRZEDAWCY (⚙️) ---
+window.authSeller = async (id, pin) => {
+    const input = prompt("Podaj PIN ogłoszenia:");
+    if (input === pin) {
+        alert("Autoryzacja pomyślna. Tu w przyszłości będzie zarządzanie rezerwacjami.");
+    } else {
+        alert("Błędny PIN.");
     }
 };
