@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
-// Zmiana na wersję kompatybilną dla Messaging
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
@@ -23,29 +22,27 @@ let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- NOWA FUNKCJA POBIERANIA TOKENA ---
 async function requestPermission() {
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
-            // Próbujemy pobrać token - zmieniona konfiguracja
+            // KLUCZ VAPID BEZ ŻADNYCH SPACJI I ZNAKÓW SPECJALNYCH
+            const cleanVapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
+            
             const token = await getToken(messaging, { 
-                vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
+                vapidKey: cleanVapidKey,
                 serviceWorkerRegistration: registration 
             });
 
             if (token) {
-                console.log("Token pobrany:", token);
                 localStorage.setItem('ryneczek_push_token', token);
                 return token;
             }
-        } else {
-            alert("Brak zgody na powiadomienia w systemie.");
         }
     } catch (error) { 
-        alert("Błąd pobierania tokena: " + error.message);
+        alert("Błąd VAPID: " + error.message);
     }
     return null;
 }
@@ -118,10 +115,11 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn'); btn.disabled = true;
-    btn.innerText = "Pobieram token...";
+    btn.innerText = "Trwa autoryzacja...";
 
     const token = await requestPermission();
 
+    btn.innerText = "Wysyłanie...";
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
