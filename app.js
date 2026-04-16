@@ -15,17 +15,19 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
-const messaging = getMessaging(app);
+let messaging = null;
 
-// PANCERNA FUNKCJA KONWERTUJĄCA DLA SAFARI
+try {
+    messaging = getMessaging(app);
+} catch (e) {
+    console.log("FCM nieobsługiwane");
+}
+
+// Funkcja konwertująca (bezpieczniejsza wersja)
 function urlBase64ToUint8Array(base64String) {
-    // 1. Czyścimy klucz ze spacji i dziwnych znaków na początku/końcu
-    const padding = '='.repeat((4 - base64String.trim().length % 4) % 4);
-    const base64 = (base64String.trim() + padding)
-        .replace(/\-/g, '+')
-        .replace(/_/g, '/');
-
     try {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
         const rawData = window.atob(base64);
         const outputArray = new Uint8Array(rawData.length);
         for (let i = 0; i < rawData.length; ++i) {
@@ -33,45 +35,53 @@ function urlBase64ToUint8Array(base64String) {
         }
         return outputArray;
     } catch (e) {
-        console.error("Błąd dekodowania Base64:", e);
         return null;
     }
 }
 
 async function requestPermission() {
+    if (!messaging) return null;
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         await navigator.serviceWorker.ready;
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
-            const vapidKey = 'BPc7WCUCSkorQqaUH01pL0GzvAIb2d4weIn_ToK1Wg8Sgt6WMH1VCQGigIMllEuVPM-KKzWMAO-5MkJrs6aT2L8';
-            const convertedVapidKey = urlBase64ToUint8Array(vapidKey);
+            const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
+            const convertedKey = urlBase64ToUint8Array(vapidKey);
             
-            if (!convertedVapidKey) {
-                alert("Błąd: Klucz VAPID ma nieprawidłowy format!");
-                return null;
-            }
-
             return await getToken(messaging, { 
-                vapidKey: convertedVapidKey, 
+                vapidKey: convertedKey || vapidKey, 
                 serviceWorkerRegistration: registration 
             });
         }
     } catch (error) { 
-        alert("Błąd VAPID (P-256): " + error.message);
+        console.error("Błąd tokena:", error);
     }
     return null;
 }
 
-// UI LOGIC
+// --- LOGIKA UI (ZABEZPIECZONA) ---
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-open-add').onclick = () => {
-        document.getElementById('add-listing-modal').classList.remove('hidden');
-        document.getElementById('listing-form').reset();
-        document.getElementById('products-to-add').innerHTML = '';
-        document.getElementById('products-to-add').appendChild(createProductFields());
-    };
+    const btnOpenAdd = document.getElementById('btn-open-add');
+    if (btnOpenAdd) {
+        btnOpenAdd.onclick = () => {
+            const modal = document.getElementById('add-listing-modal');
+            if (modal) {
+                document.getElementById('listing-form').reset();
+                document.getElementById('products-to-add').innerHTML = '';
+                document.getElementById('products-to-add').appendChild(createProductFields());
+                modal.classList.remove('hidden');
+            }
+        };
+    }
+    
+    const addMoreBtn = document.getElementById('add-more-items');
+    if (addMoreBtn) {
+        addMoreBtn.onclick = () => {
+            document.getElementById('products-to-add').appendChild(createProductFields());
+        };
+    }
 });
 
 const createProductFields = () => {
@@ -81,7 +91,7 @@ const createProductFields = () => {
         <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
         <div class="form-grid">
             <div class="input-group"><label>Cena</label><input type="number" class="p-price" step="0.01" required></div>
-            <div class="input-group"><label>Jednostka</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
+            <div class="input-group"><label>Szt/Kg</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
         </div>
         <input type="file" class="p-file" accept="image/*">
     `;
@@ -92,11 +102,16 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
-    btn.innerText = "Sprawdzam powiadomienia...";
+    btn.innerText = "Publikuję...";
 
-    const token = await requestPermission();
+    // Pobieramy token (jeśli się nie uda, idziemy dalej z pustym)
+    let token = "";
+    try {
+        token = await requestPermission();
+    } catch (e) {
+        console.log("Pominięto token");
+    }
 
-    btn.innerText = "Publikuję ogłoszenie...";
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
@@ -132,4 +147,30 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     location.reload();
 };
 
-onSnapshot(query
+// --- ŁADOWANIE OFERT ---
+const listingsCont = document.getElementById('listings-container');
+if (listingsCont) {
+    onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
+        listingsCont.innerHTML = '';
+        if (snap.empty) {
+            listingsCont.innerHTML = '<p class="status-msg">Brak ofert.</p>';
+            return;
+        }
+        snap.forEach(docSnap => {
+            const d = docSnap.data();
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            card.innerHTML = `
+                <div class="listing-header">
+                    <h3>Odbiór u: ${d.sellerName}</h3>
+                    <p>📍 ${d.address}</p>
+                </div>
+                <div class="card-footer">
+                    <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
+                    <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
+                </div>
+            `;
+            listingsCont.appendChild(card);
+        });
+    });
+}
