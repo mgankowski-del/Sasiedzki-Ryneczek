@@ -15,38 +15,66 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
-const messaging = getMessaging(app);
+let messaging = null;
 
-async function getPushToken() {
+try {
+    messaging = getMessaging(app);
+} catch (e) {
+    console.log("FCM nieobsługiwane");
+}
+
+// Funkcja pomocnicza dla iOS
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+async function requestPermission() {
+    if (!messaging) return null;
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-        await navigator.serviceWorker.ready;
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
-            // RĘCZNIE PRZYGOTOWANY KLUCZ P-256 (Twój klucz w formie bajtów)
-            const rawVapidKey = new Uint8Array([
-                4, 66, 110, 34, 73, 82, 112, 86, 119, 110, 107, 50, 66, 76, 85, 79, 49, 78, 79, 104, 90, 104, 115, 67, 85, 48, 97, 51, 116, 49, 112, 84, 120, 115, 49, 107, 50, 70, 52, 85, 65, 84, 110, 112, 88, 86, 89, 55, 107, 87, 87, 79, 78, 51, 84, 81, 68, 90, 45, 114, 53, 105, 81, 66, 102, 110, 109, 95, 88, 107, 66, 85, 72, 80, 67, 87, 71, 66, 84, 66, 117, 86, 52, 72, 69
-            ]);
-
-            const token = await getToken(messaging, { 
-                vapidKey: rawVapidKey, // Podajemy surowe bajty
+            // KLUCZ VAPID - czysty, bez żadnych dodatków
+            const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
+            
+            // Próbujemy standardowo przez SDK Firebase
+            return await getToken(messaging, { 
+                vapidKey: vapidKey, 
                 serviceWorkerRegistration: registration 
             });
-            return token;
         }
-    } catch (error) {
-        alert("Błąd VAPID P-256: " + error.message);
+    } catch (error) { 
+        console.error("Błąd pobierania tokena:", error);
     }
     return null;
 }
 
-// Reszta Twojej logiki UI (skrócona dla jasności, zostaw swoje funkcje otwierania okien)
+let currentEditId = null;
+let editingResIndex = null;
+let cachedListingData = null;
+let isEditingOffer = false;
+
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-open-add').onclick = () => {
-        document.getElementById('add-listing-modal').classList.remove('hidden');
-        document.getElementById('listing-form').reset();
-        document.getElementById('products-to-add').innerHTML = '';
+    const btnOpenAdd = document.getElementById('btn-open-add');
+    if (btnOpenAdd) {
+        btnOpenAdd.onclick = () => {
+            isEditingOffer = false;
+            document.getElementById('modal-title').innerText = "Nowa oferta";
+            document.getElementById('listing-form').reset();
+            document.getElementById('products-to-add').innerHTML = '';
+            document.getElementById('products-to-add').appendChild(createProductFields());
+            document.getElementById('add-listing-modal').classList.remove('hidden');
+        };
+    }
+    document.getElementById('add-more-items').onclick = () => {
         document.getElementById('products-to-add').appendChild(createProductFields());
     };
 });
@@ -54,13 +82,24 @@ document.addEventListener('DOMContentLoaded', () => {
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
+    const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.5);
     div.innerHTML = `
-        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
+        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
         <div class="form-grid">
-            <div class="input-group"><label>Cena</label><input type="number" class="p-price" step="0.01" required></div>
-            <div class="input-group"><label>Szt/Kg</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
+            <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
+            <div class="input-group"><label>Jednostka</label>
+                <select class="p-unit"><option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option><option value="kg" ${data.unit==='kg'?'selected':''}>kg</option></select>
+            </div>
         </div>
-        <div class="input-group"><label>Ilość całkowita</label><input type="number" class="p-total" step="0.01" required></div>
+        <div class="form-grid">
+            <div class="input-group"><label>Ilość całkowita</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+            <div class="input-group"><label>Krok</label>
+                <select class="p-step">
+                    <option value="1" ${initialStep==1?'selected':''}>1</option>
+                    <option value="0.5" ${initialStep==0.5?'selected':''}>0.5</option>
+                </select>
+            </div>
+        </div>
         <input type="file" class="p-file" accept="image/*">
     `;
     return div;
@@ -68,45 +107,50 @@ const createProductFields = (data = {}) => {
 
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
-    const btn = document.getElementById('submitBtn');
+    const btn = document.getElementById('submitBtn'); 
     btn.disabled = true;
-    btn.innerText = "Pobieram token...";
+    btn.innerText = "Trwa publikacja...";
 
-    const token = await getPushToken();
+    // Próba pobrania tokena
+    const token = await requestPermission();
 
-    btn.innerText = "Wysyłam ogłoszenie...";
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
-        let imageUrl = "";
+        let imageUrl = div.dataset.oldUrl || "";
         if (file) {
             const sRef = ref(storage, `products/${Date.now()}_${file.name}`);
-            await uploadBytes(sRef, file);
+            await uploadBytes(sRef, file); 
             imageUrl = await getDownloadURL(sRef);
         }
         products.push({
-            name: div.querySelector('.p-name').value,
+            name: div.querySelector('.p-name').value, 
             price: parseFloat(div.querySelector('.p-price').value),
-            unit: div.querySelector('.p-unit').value,
+            unit: div.querySelector('.p-unit').value, 
             totalQty: parseFloat(div.querySelector('.p-total').value),
-            step: 1,
+            step: parseFloat(div.querySelector('.p-step').value), 
             imageUrl
         });
     }
 
-    await addDoc(collection(db, "listings"), {
-        sellerName: document.getElementById('sellerName').value,
+    const data = {
+        sellerName: document.getElementById('sellerName').value, 
         sellerPhone: document.getElementById('sellerPhone').value,
-        sellerToken: token || "",
+        sellerToken: token || "", 
         address: document.getElementById('pickupAddress').value,
-        pickupTimes: document.getElementById('pickupTimes').value,
+        pickupTimes: document.getElementById('pickupTimes').value, 
         expiryDate: document.getElementById('expiryDate').value,
-        pin: document.getElementById('pin').value,
-        items: products,
-        createdAt: new Date(),
-        reservations: []
-    });
+        pin: document.getElementById('pin').value, 
+        items: products, 
+        updatedAt: new Date(), 
+        reservations: cachedListingData?.reservations || []
+    };
 
+    if(isEditingOffer) await updateDoc(doc(db, "listings", currentEditId), data);
+    else { 
+        data.createdAt = new Date(); 
+        await addDoc(collection(db, "listings"), data); 
+    }
     location.reload();
 };
 
@@ -116,9 +160,19 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     cont.innerHTML = '';
     snap.forEach(docSnap => {
         const d = docSnap.data();
-        const card = document.createElement('div');
+        const card = document.createElement('div'); 
         card.className = 'product-card';
-        card.innerHTML = `<h3>${d.sellerName}</h3><p>${d.address}</p>`;
+        card.innerHTML = `
+            <div class="listing-header">
+                <h3>Odbiór u: ${d.sellerName}</h3>
+                <p>📍 ${d.address} | 📞 ${d.sellerPhone || ''}</p>
+                <p>⏰ ${d.pickupTimes}</p>
+            </div>
+            <div class="card-footer">
+                <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
+                <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
+            </div>
+        `;
         cont.appendChild(card);
     });
 });
