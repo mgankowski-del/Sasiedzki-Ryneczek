@@ -40,7 +40,7 @@ async function requestPermission() {
 
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-            const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
+            const vapidKey = 'BPc7WCUCSkorQqaUH01pL0GzvAIb2d4weIn_ToK1Wg8Sgt6WMH1VCQGigIMllEuVPM-KKzWMAO-5MkJrs6aT2L8';
             
             // Konwertujemy klucz na format binarny przed wysłaniem
             const convertedVapidKey = urlBase64ToUint8Array(vapidKey);
