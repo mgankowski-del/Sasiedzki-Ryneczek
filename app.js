@@ -30,10 +30,7 @@ let isEditingOffer = false;
 async function requestPermission() {
     if (!messaging) return null;
     try {
-        // Wymuszona rejestracja Service Workera dla iOS
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-        console.log("Service Worker zarejestrowany.");
-
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
             const token = await getToken(messaging, { 
@@ -41,14 +38,11 @@ async function requestPermission() {
                 serviceWorkerRegistration: registration 
             });
             if (token) {
-                console.log("Token pobrany:", token);
                 localStorage.setItem('ryneczek_push_token', token);
                 return token;
             }
         }
-    } catch (error) { 
-        console.error("Błąd powiadomień:", error); 
-    }
+    } catch (error) { console.error("Błąd tokena:", error); }
     return null;
 }
 
@@ -106,8 +100,7 @@ const createProductFields = (data = {}) => {
 
 document.addEventListener('DOMContentLoaded', () => {
     cleanupExpired();
-    document.getElementById('btn-open-add').onclick = async () => {
-        await requestPermission();
+    document.getElementById('btn-open-add').onclick = () => {
         isEditingOffer = false;
         document.getElementById('modal-title').innerText = "Nowa oferta";
         document.getElementById('listing-form').reset();
@@ -118,11 +111,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-more-items').onclick = () => document.getElementById('products-to-add').appendChild(createProductFields());
 });
 
+// --- KLUCZOWA ZMIANA: CZEKAMY NA TOKEN PRZY WYSYŁCE ---
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn'); btn.disabled = true;
+    btn.innerText = "Pobieranie uprawnień...";
+
+    // WYMUSZAMY POBRANIE TOKENA PRZED ZAPISEM
+    const token = await requestPermission();
+
     const products = [];
-    
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
         let imageUrl = div.dataset.oldUrl || "";
@@ -140,7 +138,7 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     const data = {
         sellerName: document.getElementById('sellerName').value, 
         sellerPhone: document.getElementById('sellerPhone').value,
-        sellerToken: localStorage.getItem('ryneczek_push_token') || "", 
+        sellerToken: token || localStorage.getItem('ryneczek_push_token') || "", 
         address: document.getElementById('pickupAddress').value,
         pickupTimes: document.getElementById('pickupTimes').value, 
         expiryDate: document.getElementById('expiryDate').value,
