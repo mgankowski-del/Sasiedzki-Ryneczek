@@ -16,30 +16,32 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 let messaging = null;
-try { messaging = getMessaging(app); } catch (e) {}
+try { messaging = getMessaging(app); } catch (e) { console.log("Messaging not supported"); }
 
-// POPRAWIONA FUNKCJA KONWERSJI KLUCZA VAPID
+// --- PANCERNA KONWERSJA KLUCZA VAPID DLA IOS ---
 function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-        .replace(/\-/g, '+')    // Zamień minusy na plusy
-        .replace(/_/g, '/');    // Zamień podkreślenia na ukośniki
-
     try {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/\-/g, '+')
+            .replace(/_/g, '/');
+
         const rawData = window.atob(base64);
         const outputArray = new Uint8Array(rawData.length);
+
         for (let i = 0; i < rawData.length; ++i) {
             outputArray[i] = rawData.charCodeAt(i);
         }
         return outputArray;
-    } catch (err) {
-        console.error("Błąd dekodowania Base64:", err);
+    } catch (e) {
+        console.error("Błąd konwersji klucza:", e);
         return null;
     }
 }
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
+// --- BEZPIECZNA REJESTRACJA POWIADOMIEŃ ---
 window.setupNotifications = async () => {
     if (!('serviceWorker' in navigator)) return alert("Brak obsługi Service Worker.");
     
@@ -48,15 +50,15 @@ window.setupNotifications = async () => {
         const registration = await navigator.serviceWorker.register(swPath, { scope: './' });
         
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return alert("Zezwól na powiadomienia w ustawieniach.");
+        if (permission !== 'granted') return alert("Zezwól na powiadomienia w ustawieniach Safari.");
 
         const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
-        const convertedVapidKey = urlBase64ToUint8Array(vapidKey);
+        const convertedKey = urlBase64ToUint8Array(vapidKey);
 
-        if (!convertedVapidKey) throw new Error("Nie udało się przygotować klucza bezpieczeństwa.");
+        if (!convertedKey) throw new Error("Błąd formatu klucza bezpieczeństwa.");
 
         const token = await getToken(messaging, { 
-            vapidKey: convertedVapidKey, 
+            vapidKey: convertedKey, 
             serviceWorkerRegistration: registration 
         });
 
@@ -65,28 +67,23 @@ window.setupNotifications = async () => {
             alert("✅ Sukces! Powiadomienia aktywne.");
         }
     } catch (error) {
-        console.error(error);
         alert("Błąd: " + error.message);
     }
 };
 
-// --- STABILNY KOD RESZTY APLIKACJI ---
+// --- FUNKCJE PRODUKTÓW I FORMULARZA ---
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     div.innerHTML = `
-        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" required></div>
+        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" required></div>
-            <div class="input-group"><label>Jednostka</label>
-                <select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select>
-            </div>
+            <div class="input-group"><label>Jedn.</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
         </div>
         <div class="form-grid">
             <div class="input-group"><label>Pula</label><input type="number" class="p-total" step="0.01" required></div>
-            <div class="input-group"><label>Krok</label>
-                <select class="p-step"><option value="1">1</option><option value="0.5">0.5</option><option value="100">100g</option></select>
-            </div>
+            <div class="input-group"><label>Krok</label><select class="p-step"><option value="1">1</option><option value="0.5">0.5</option></select></div>
         </div>
         <input type="file" class="p-file" accept="image/*">
     `;
@@ -102,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const d = docSnap.data();
                 const card = document.createElement('div');
                 card.className = 'product-card';
-                card.innerHTML = `<div class="listing-header"><h3>U: ${d.sellerName}</h3><p>📍 ${d.address} | 📞 ${d.sellerPhone}</p></div>
+                card.innerHTML = `<div class="listing-header"><h3>U: ${d.sellerName}</h3><p>📍 ${d.address}</p></div>
                 <div class="card-footer">
                     <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
                     <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
@@ -112,14 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const btnOpen = document.getElementById('btn-open-add');
-    if (btnOpen) {
-        btnOpen.onclick = () => {
-            document.getElementById('products-to-add').innerHTML = '';
-            document.getElementById('products-to-add').appendChild(createProductFields());
-            document.getElementById('add-listing-modal').classList.remove('hidden');
-        };
-    }
+    document.getElementById('btn-open-add').onclick = () => {
+        document.getElementById('products-to-add').innerHTML = '';
+        document.getElementById('products-to-add').appendChild(createProductFields());
+        document.getElementById('add-listing-modal').classList.remove('hidden');
+    };
 });
 
 document.getElementById('listing-form').onsubmit = async (e) => {
