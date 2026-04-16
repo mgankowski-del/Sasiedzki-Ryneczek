@@ -17,33 +17,41 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const messaging = getMessaging(app);
 
-// FUNKCJA KONWERTUJĄCA - Rozwiązuje błąd P-256 na iPhone
+// PANCERNA FUNKCJA KONWERTUJĄCA DLA SAFARI
 function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
+    // 1. Czyścimy klucz ze spacji i dziwnych znaków na początku/końcu
+    const padding = '='.repeat((4 - base64String.trim().length % 4) % 4);
+    const base64 = (base64String.trim() + padding)
         .replace(/\-/g, '+')
         .replace(/_/g, '/');
 
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
+    try {
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    } catch (e) {
+        console.error("Błąd dekodowania Base64:", e);
+        return null;
     }
-    return outputArray;
 }
 
 async function requestPermission() {
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         await navigator.serviceWorker.ready;
-
         const permission = await Notification.requestPermission();
+        
         if (permission === 'granted') {
             const vapidKey = 'BPc7WCUCSkorQqaUH01pL0GzvAIb2d4weIn_ToK1Wg8Sgt6WMH1VCQGigIMllEuVPM-KKzWMAO-5MkJrs6aT2L8';
-            
-            // Konwertujemy klucz na format binarny przed wysłaniem
             const convertedVapidKey = urlBase64ToUint8Array(vapidKey);
+            
+            if (!convertedVapidKey) {
+                alert("Błąd: Klucz VAPID ma nieprawidłowy format!");
+                return null;
+            }
 
             return await getToken(messaging, { 
                 vapidKey: convertedVapidKey, 
@@ -56,7 +64,7 @@ async function requestPermission() {
     return null;
 }
 
-// Reszta logiki UI
+// UI LOGIC
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-open-add').onclick = () => {
         document.getElementById('add-listing-modal').classList.remove('hidden');
@@ -84,11 +92,11 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
-    btn.innerText = "Pobieram token...";
+    btn.innerText = "Sprawdzam powiadomienia...";
 
     const token = await requestPermission();
 
-    btn.innerText = "Publikuję...";
+    btn.innerText = "Publikuję ogłoszenie...";
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
@@ -102,7 +110,7 @@ document.getElementById('listing-form').onsubmit = async (e) => {
             name: div.querySelector('.p-name').value,
             price: parseFloat(div.querySelector('.p-price').value),
             unit: div.querySelector('.p-unit').value,
-            totalQty: 100, // uproszczone dla testu
+            totalQty: 100,
             step: 1,
             imageUrl
         });
@@ -124,15 +132,4 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     location.reload();
 };
 
-onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
-    const cont = document.getElementById('listings-container');
-    if (!cont) return;
-    cont.innerHTML = '';
-    snap.forEach(docSnap => {
-        const d = docSnap.data();
-        const card = document.createElement('div');
-        card.className = 'product-card';
-        card.innerHTML = `<h3>${d.sellerName}</h3><p>${d.address}</p>`;
-        cont.appendChild(card);
-    });
-});
+onSnapshot(query
