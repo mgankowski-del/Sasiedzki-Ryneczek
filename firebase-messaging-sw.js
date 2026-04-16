@@ -16,7 +16,7 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: 'https://via.placeholder.com/192'
+    icon: 'https://mgankowski-del.github.io/Sasiedzki-Ryneczek/icon-192.png'
   };
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
