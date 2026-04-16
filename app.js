@@ -20,55 +20,50 @@ let messaging = null;
 try {
     messaging = getMessaging(app);
 } catch (e) {
-    console.warn("Firebase Messaging nie jest obsługiwane w tej przeglądarce.");
+    console.warn("Messaging nieobsługiwany.");
 }
 
-// Funkcja przygotowująca klucz VAPID jako tablicę bajtów (rozwiązuje błąd invalid characters)
-const getVapidKeyArray = () => {
-    return new Uint8Array([
-        4, 66, 110, 34, 73, 82, 112, 86, 119, 110, 107, 50, 66, 76, 85, 79, 
-        49, 78, 79, 104, 90, 104, 115, 67, 85, 48, 97, 51, 116, 49, 112, 84, 
-        120, 115, 49, 107, 50, 70, 52, 85, 65, 84, 110, 112, 88, 86, 89, 55, 
-        107, 87, 87, 79, 78, 51, 84, 81, 68, 90, 45, 114, 53, 105, 81, 66, 
-        102, 110, 109, 95, 88, 107, 66, 85, 72, 80, 67, 87, 71, 66, 84, 66, 
-        117, 86, 52, 72, 69
-    ]);
-};
+// --- FUNKCJA ROZWIĄZUJĄCA BŁĄD P-256 ---
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-// --- GŁÓWNA KONFIGURACJA POWIADOMIEŃ ---
+// --- KONFIGURACJA POWIADOMIEŃ ---
 window.setupNotifications = async () => {
-    if (!('serviceWorker' in navigator)) {
-        return alert("Twoja przeglądarka nie obsługuje Service Workerów.");
-    }
-
+    if (!('serviceWorker' in navigator)) return alert("Brak obsługi Service Worker.");
+    
     try {
-        // Używamy prostej, relatywnej ścieżki, którą Safari najlepiej rozumie
-        // Dodajemy tylko timestamp, żeby ominąć cache
-        const swPath = './firebase-messaging-sw.js?t=' + Date.now();
-        
-        console.log("Rejestracja SW...");
+        // Używamy relatywnej ścieżki z timestampem przeciw cache
+        const swPath = './firebase-messaging-sw.js?v=' + Date.now();
         const registration = await navigator.serviceWorker.register(swPath);
-
-        // Czekamy chwilę, aż SW będzie gotowy (kluczowe na iOS!)
+        
+        // Czekamy na gotowość SW
         await navigator.serviceWorker.ready;
 
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            return alert("Musisz zezwolić na powiadomienia w ustawieniach Safari.");
-        }
+        if (permission !== 'granted') return alert("Zezwól na powiadomienia w ustawieniach Safari.");
 
-        // Używamy klucza VAPID bezpośrednio jako tekst - Firebase sam go sobie 
-        // przeliczy, a my unikniemy błędów w naszych funkcjach konwertujących
-        const token = await getToken(messaging, {
-            vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
-            serviceWorkerRegistration: registration
+        const vapidPublicKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
+        const convertedKey = urlBase64ToUint8Array(vapidPublicKey);
+
+        const token = await getToken(messaging, { 
+            vapidKey: convertedKey, 
+            serviceWorkerRegistration: registration 
         });
 
         if (token) {
             localStorage.setItem('ryneczek_push_token', token);
             alert("✅ Sukces! Powiadomienia aktywne.");
+            console.log("Token:", token);
         }
     } catch (error) {
         console.error("Błąd:", error);
@@ -76,7 +71,7 @@ window.setupNotifications = async () => {
     }
 };
 
-// --- LOGIKA WYŚWIETLANIA OFERT I FORMULARZY ---
+// --- LOGIKA OFERT ---
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
@@ -100,7 +95,7 @@ const createProductFields = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Subskrypcja ofert w czasie rzeczywistym
+    // Odświeżanie listy ofert
     onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
         const cont = document.getElementById('listings-container');
         if (!cont) return;
@@ -115,8 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p>📍 ${d.address} | 📞 ${d.sellerPhone}</p>
                 </div>
                 <div class="card-footer">
-                    <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów produkty</button>
-                    <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️ Zarządzaj</button>
+                    <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
+                    <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
                 </div>`;
             cont.appendChild(card);
         });
@@ -178,7 +173,7 @@ document.getElementById('listing-form').onsubmit = async (e) => {
         location.reload();
     } catch (err) {
         console.error(err);
-        alert("Błąd publikacji: " + err.message);
+        alert("Błąd: " + err.message);
         btn.disabled = false;
         btn.innerText = "Opublikuj ofertę";
     }
