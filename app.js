@@ -18,16 +18,24 @@ const storage = getStorage(app);
 let messaging = null;
 try { messaging = getMessaging(app); } catch (e) {}
 
-// Funkcja pomocnicza do konwersji klucza VAPID dla iOS
+// POPRAWIONA FUNKCJA KONWERSJI KLUCZA VAPID
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
+    const base64 = (base64String + padding)
+        .replace(/\-/g, '+')    // Zamień minusy na plusy
+        .replace(/_/g, '/');    // Zamień podkreślenia na ukośniki
+
+    try {
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    } catch (err) {
+        console.error("Błąd dekodowania Base64:", err);
+        return null;
     }
-    return outputArray;
 }
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
@@ -42,9 +50,10 @@ window.setupNotifications = async () => {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return alert("Zezwól na powiadomienia w ustawieniach.");
 
-        // KLUCZ VAPID PRZYGOTOWANY SPECJALNIE DLA IOS
         const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
         const convertedVapidKey = urlBase64ToUint8Array(vapidKey);
+
+        if (!convertedVapidKey) throw new Error("Nie udało się przygotować klucza bezpieczeństwa.");
 
         const token = await getToken(messaging, { 
             vapidKey: convertedVapidKey, 
@@ -61,7 +70,7 @@ window.setupNotifications = async () => {
     }
 };
 
-// --- RESZTA STABILNEGO KODU ---
+// --- STABILNY KOD RESZTY APLIKACJI ---
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
@@ -103,11 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('btn-open-add').onclick = () => {
-        document.getElementById('products-to-add').innerHTML = '';
-        document.getElementById('products-to-add').appendChild(createProductFields());
-        document.getElementById('add-listing-modal').classList.remove('hidden');
-    };
+    const btnOpen = document.getElementById('btn-open-add');
+    if (btnOpen) {
+        btnOpen.onclick = () => {
+            document.getElementById('products-to-add').innerHTML = '';
+            document.getElementById('products-to-add').appendChild(createProductFields());
+            document.getElementById('add-listing-modal').classList.remove('hidden');
+        };
+    }
 });
 
 document.getElementById('listing-form').onsubmit = async (e) => {
