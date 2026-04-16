@@ -16,13 +16,15 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 let messaging = null;
-try { messaging = getMessaging(app); } catch (e) {}
 
-window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+try {
+    messaging = getMessaging(app);
+} catch (e) {
+    console.warn("Firebase Messaging nie jest obsługiwane w tej przeglądarce.");
+}
 
-// --- RĘCZNIE PRZYGOTOWANA TABLICA BAJTÓW DLA TWOJEGO KLUCZA VAPID ---
-// To omija funkcję atob() i błąd "invalid characters"
-const getVapidKey = () => {
+// Funkcja przygotowująca klucz VAPID jako tablicę bajtów (rozwiązuje błąd invalid characters)
+const getVapidKeyArray = () => {
     return new Uint8Array([
         4, 66, 110, 34, 73, 82, 112, 86, 119, 110, 107, 50, 66, 76, 85, 79, 
         49, 78, 79, 104, 90, 104, 115, 67, 85, 48, 97, 51, 116, 49, 112, 84, 
@@ -33,44 +35,64 @@ const getVapidKey = () => {
     ]);
 };
 
-window.setupNotifications = async () => {
-    if (!('serviceWorker' in navigator)) return alert("Brak obsługi SW.");
-    
-    try {
-        const swPath = './firebase-messaging-sw.js?v=' + Date.now();
-        const registration = await navigator.serviceWorker.register(swPath, { scope: './' });
-        
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return alert("Zezwól na powiadomienia w Safari.");
+window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-        const token = await getToken(messaging, { 
-            vapidKey: getVapidKey(), 
-            serviceWorkerRegistration: registration 
+// --- GŁÓWNA KONFIGURACJA POWIADOMIEŃ ---
+window.setupNotifications = async () => {
+    if (!('serviceWorker' in navigator)) {
+        return alert("Twoja przeglądarka nie obsługuje Service Workerów.");
+    }
+
+    try {
+        // PEŁNA ŚCIEŻKA DO TWOJEGO REPOZYTORIUM
+        const swUrl = 'https://mgankowski-del.github.io/Sasiedzki-Ryneczek/firebase-messaging-sw.js';
+        
+        console.log("Próba rejestracji SW z adresu:", swUrl);
+        
+        const registration = await navigator.serviceWorker.register(swUrl, {
+            scope: '/Sasiedzki-Ryneczek/'
+        });
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            return alert("Musisz zezwolić na powiadomienia w ustawieniach Safari.");
+        }
+
+        const token = await getToken(messaging, {
+            vapidKey: getVapidKeyArray(),
+            serviceWorkerRegistration: registration
         });
 
         if (token) {
             localStorage.setItem('ryneczek_push_token', token);
             alert("✅ Sukces! Powiadomienia aktywne.");
+            console.log("Token:", token);
+        } else {
+            alert("Nie udało się uzyskać tokena. Sprawdź konsolę.");
         }
     } catch (error) {
-        console.error(error);
+        console.error("Błąd szczegółowy:", error);
         alert("Błąd: " + error.message);
     }
 };
 
-// --- RESTA KODU (STABILNA) ---
+// --- LOGIKA WYŚWIETLANIA OFERT I FORMULARZY ---
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     div.innerHTML = `
-        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
+        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" required></div>
         <div class="form-grid">
-            <div class="input-group"><label>Cena</label><input type="number" class="p-price" step="0.01" required></div>
-            <div class="input-group"><label>Jedn.</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
+            <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" required></div>
+            <div class="input-group"><label>Jednostka</label>
+                <select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select>
+            </div>
         </div>
         <div class="form-grid">
-            <div class="input-group"><label>Pula</label><input type="number" class="p-total" step="0.01" required></div>
-            <div class="input-group"><label>Krok</label><select class="p-step"><option value="1">1</option><option value="0.5">0.5</option></select></div>
+            <div class="input-group"><label>Pula (ilość)</label><input type="number" class="p-total" step="0.01" required></div>
+            <div class="input-group"><label>Krok wyboru</label>
+                <select class="p-step"><option value="1">1</option><option value="0.5">0.5</option><option value="0.1">0.1</option></select>
+            </div>
         </div>
         <input type="file" class="p-file" accept="image/*">
     `;
@@ -78,29 +100,34 @@ const createProductFields = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Subskrypcja ofert w czasie rzeczywistym
     onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
         const cont = document.getElementById('listings-container');
-        if (cont) {
-            cont.innerHTML = '';
-            snap.forEach(docSnap => {
-                const d = docSnap.data();
-                const card = document.createElement('div');
-                card.className = 'product-card';
-                card.innerHTML = `<div class="listing-header"><h3>U: ${d.sellerName}</h3><p>📍 ${d.address}</p></div>
+        if (!cont) return;
+        cont.innerHTML = '';
+        snap.forEach(docSnap => {
+            const d = docSnap.data();
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            card.innerHTML = `
+                <div class="listing-header">
+                    <h3>Sprzedawca: ${d.sellerName}</h3>
+                    <p>📍 ${d.address} | 📞 ${d.sellerPhone}</p>
+                </div>
                 <div class="card-footer">
-                    <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
-                    <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
+                    <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów produkty</button>
+                    <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️ Zarządzaj</button>
                 </div>`;
-                cont.appendChild(card);
-            });
-        }
+            cont.appendChild(card);
+        });
     });
 
-    const btnOpen = document.getElementById('btn-open-add');
-    if (btnOpen) {
-        btnOpen.onclick = () => {
-            document.getElementById('products-to-add').innerHTML = '';
-            document.getElementById('products-to-add').appendChild(createProductFields());
+    const btnOpenAdd = document.getElementById('btn-open-add');
+    if (btnOpenAdd) {
+        btnOpenAdd.onclick = () => {
+            const container = document.getElementById('products-to-add');
+            container.innerHTML = '';
+            container.appendChild(createProductFields());
             document.getElementById('add-listing-modal').classList.remove('hidden');
         };
     }
@@ -109,10 +136,14 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
-    btn.innerText = "Publikuję...";
+    btn.disabled = true;
+    btn.innerText = "Publikowanie...";
+
     try {
         const products = [];
-        for (const div of document.querySelectorAll('.product-form-box')) {
+        const productBoxes = document.querySelectorAll('.product-form-box');
+        
+        for (const div of productBoxes) {
             const file = div.querySelector('.p-file').files[0];
             let imageUrl = "";
             if (file) {
@@ -126,9 +157,10 @@ document.getElementById('listing-form').onsubmit = async (e) => {
                 unit: div.querySelector('.p-unit').value,
                 totalQty: parseFloat(div.querySelector('.p-total').value),
                 step: parseFloat(div.querySelector('.p-step').value),
-                imageUrl
+                imageUrl: imageUrl
             });
         }
+
         await addDoc(collection(db, "listings"), {
             sellerName: document.getElementById('sellerName').value,
             sellerPhone: document.getElementById('sellerPhone').value,
@@ -141,6 +173,13 @@ document.getElementById('listing-form').onsubmit = async (e) => {
             createdAt: new Date(),
             reservations: []
         });
+
+        alert("Oferta opublikowana!");
         location.reload();
-    } catch (err) { alert(err.message); btn.innerText = "Publikuj"; }
+    } catch (err) {
+        console.error(err);
+        alert("Błąd publikacji: " + err.message);
+        btn.disabled = false;
+        btn.innerText = "Opublikuj ofertę";
+    }
 };
