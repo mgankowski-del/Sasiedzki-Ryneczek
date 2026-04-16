@@ -15,24 +15,44 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
-const messaging = getMessaging(app);
+let messaging = null;
+
+// Rejestracja Messaging tylko jeśli przeglądarka wspiera powiadomienia
+if ('Notification' in window && 'serviceWorker' in navigator) {
+    try { 
+        messaging = getMessaging(app); 
+    } catch (e) { 
+        console.log("Messaging nieobsługiwany w tej przeglądarce."); 
+    }
+}
 
 let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- POWIADOMIENIA ---
+// --- POWIADOMIENIA (Z POPRAWIONYM KLUCZEM VAPID) ---
 async function requestPermission() {
+    if (!messaging) return null;
     try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-            const token = await getToken(messaging, { vapidKey: 'nP5epfMI7IJkkq-8zvos2dLjYoVXJjYF9YwLsQ7knLk' });
-            if (token) localStorage.setItem('ryneczek_push_token', token);
+            // Klucz PUBLICZNY z Twojego screena
+            const token = await getToken(messaging, { 
+                vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE' 
+            });
+            if (token) {
+                console.log("Pobrano token FCM:", token);
+                localStorage.setItem('ryneczek_push_token', token);
+                return token;
+            }
+        } else {
+            console.log("Nie wyrażono zgody na powiadomienia.");
         }
-    } catch (error) {
-        console.error("Błąd podczas prośby o powiadomienia:", error);
+    } catch (error) { 
+        console.error("Błąd pobierania tokena:", error); 
     }
+    return null;
 }
 
 // --- AUTOSPRZĄTANIE ---
@@ -41,26 +61,26 @@ const cleanupExpired = async () => {
     const snap = await getDocs(collection(db, "listings"));
     snap.forEach(async (docSnap) => {
         const d = docSnap.data();
-        if (d.expiryDate) {
-            const exp = new Date(d.expiryDate);
-            if (now > new Date(exp.getTime() + 24 * 60 * 60 * 1000)) await deleteDoc(doc(db, "listings", docSnap.id));
+        if (d.expiryDate && now > new Date(new Date(d.expiryDate).getTime() + 24*60*60*1000)) {
+            await deleteDoc(doc(db, "listings", docSnap.id));
         }
     });
 };
 
-const getRem = (name, total, res, ignoreIdx = null) => {
+const getRem = (name, total, res = [], ignoreIdx = null) => {
     let reserved = 0;
-    res.forEach((r, idx) => { 
-        if (ignoreIdx !== null && idx === ignoreIdx) return; 
-        const item = r.items.find(i => i.name === name); 
-        if (item) reserved += parseFloat(item.qty); 
-    });
+    if (Array.isArray(res)) {
+        res.forEach((r, idx) => {
+            if (ignoreIdx !== null && idx === ignoreIdx) return;
+            const item = r.items?.find(i => i.name === name);
+            if (item) reserved += parseFloat(item.qty);
+        });
+    }
     return Math.max(0, total - reserved);
 };
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-// --- FORMULARZ PRODUKTÓW ---
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
@@ -90,8 +110,9 @@ const createProductFields = (data = {}) => {
 
 document.addEventListener('DOMContentLoaded', () => {
     cleanupExpired();
-    document.getElementById('btn-open-add').onclick = () => {
-        requestPermission();
+    document.getElementById('btn-open-add').onclick = async () => {
+        // Prośba o powiadomienia przy próbie dodania ogłoszenia
+        await requestPermission();
         isEditingOffer = false;
         document.getElementById('modal-title').innerText = "Nowa oferta";
         document.getElementById('listing-form').reset();
@@ -102,11 +123,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-more-items').onclick = () => document.getElementById('products-to-add').appendChild(createProductFields());
 });
 
-// --- ZAPIS OFERTY ---
+// --- ZAPIS OFERTY (ZE SPRZEDAWCĄ) ---
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn'); btn.disabled = true;
     const products = [];
+    
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
         let imageUrl = div.dataset.oldUrl || "";
@@ -120,29 +142,34 @@ document.getElementById('listing-form').onsubmit = async (e) => {
             step: parseFloat(div.querySelector('.p-step').value), imageUrl
         });
     }
+
     const data = {
         sellerName: document.getElementById('sellerName').value, 
         sellerPhone: document.getElementById('sellerPhone').value,
+        sellerToken: localStorage.getItem('ryneczek_push_token') || "", // KLUCZOWE POLE
         address: document.getElementById('pickupAddress').value,
         pickupTimes: document.getElementById('pickupTimes').value, 
         expiryDate: document.getElementById('expiryDate').value,
         pin: document.getElementById('pin').value, items: products, 
         updatedAt: new Date(), reservations: cachedListingData?.reservations || []
     };
+
     if(isEditingOffer) await updateDoc(doc(db, "listings", currentEditId), data);
     else { data.createdAt = new Date(); await addDoc(collection(db, "listings"), data); }
     location.reload();
 };
 
-// --- ŁADOWANIE ---
+// --- ŁADOWANIE LISTINGÓW ---
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
     cont.innerHTML = '';
     const now = new Date();
+    let count = 0;
     snap.forEach(docSnap => {
         const d = docSnap.data();
         if (d.expiryDate && now > new Date(d.expiryDate)) return;
+        count++;
         const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
             <div class="listing-header">
@@ -150,7 +177,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
                 <p>📍 ${d.address} | 📞 ${d.sellerPhone || 'Brak telefonu'}</p>
                 <p style="margin-top: 8px; color: var(--accent); font-weight: bold; font-size: 0.95rem;">⏰ Odbiór: ${d.pickupTimes}</p>
             </div>
-            ${d.items.map(it => {
+            ${(d.items || []).map(it => {
                 const rem = getRem(it.name, it.totalQty, d.reservations);
                 return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/60?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
             }).join('')}
@@ -161,29 +188,26 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         `;
         cont.appendChild(card);
     });
+    if(count === 0) cont.innerHTML = '<p class="status-msg">Obecnie nie ma żadnych ofert.</p>';
 });
 
 // --- OKNO ZAMÓWIENIA ---
 window.openOrderModal = async (id, editIdx = null) => {
-    requestPermission();
-    
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
-    
-    // Wstawienie informacji o godzinach odbioru
     document.getElementById('modal-pickup-info').innerText = `(⏰ Możliwe godziny: ${d.pickupTimes})`;
     
-    d.items.forEach((it) => {
+    (d.items || []).forEach((it) => {
         const rem = getRem(it.name, it.totalQty, d.reservations, editingResIndex);
-        const startVal = (editingResIndex !== null) ? (d.reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
+        const startVal = (editingResIndex !== null) ? (d.reservations[editIdx].items?.find(i => i.name === it.name)?.qty || 0) : 0;
         container.innerHTML += `
             <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                <div style="flex:1"><b style="display:block">${it.name}</b><small style="color:var(--accent)">Dostępne: ${Number(rem.toFixed(2))}</small></div>
+                <div style="flex:1"><b>${it.name}</b><br><small style="color:var(--accent)">Dostępne: ${Number(rem.toFixed(2))}</small></div>
                 <div style="display:flex; align-items:center; gap:10px;">
                     <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.nextElementSibling; s.innerText = Number(Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2)); window.updateSum();">-</button>
-                    <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="font-weight:bold; min-width:40px; text-align:center">${Number(startVal).toString()}</span>
-                    <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=Number((parseFloat(s.innerText)+${it.step}).toFixed(2));window.updateSum();}else{alert('Brak wystarczającej ilości w puli!');}">+</button>
+                    <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="font-weight:bold; min-width:40px; text-align:center">${Number(startVal)}</span>
+                    <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=Number((parseFloat(s.innerText)+${it.step}).toFixed(2));window.updateSum();}else{alert('Brak wystarczającej ilości!');}">+</button>
                 </div>
             </div>`;
     });
@@ -194,10 +218,11 @@ window.openOrderModal = async (id, editIdx = null) => {
         document.getElementById('buyerPin').value = localStorage.getItem('ryneczek_pin') || '';
         if(document.getElementById('buyerName').value) lookUpOrder();
     } else {
-        document.getElementById('buyerName').value = d.reservations[editIdx].buyerName;
-        document.getElementById('buyerPhone').value = d.reservations[editIdx].buyerPhone || '';
-        document.getElementById('buyerPin').value = d.reservations[editIdx].buyerPin;
-        document.getElementById('buyerPickupTime').value = d.reservations[editIdx].time;
+        const r = d.reservations[editIdx];
+        document.getElementById('buyerName').value = r.buyerName;
+        document.getElementById('buyerPhone').value = r.buyerPhone || '';
+        document.getElementById('buyerPin').value = r.buyerPin;
+        document.getElementById('buyerPickupTime').value = r.time;
     }
     document.getElementById('reservation-modal').classList.remove('hidden'); window.updateSum();
 };
@@ -210,7 +235,7 @@ window.updateSum = () => {
 const lookUpOrder = () => {
     const name = document.getElementById('buyerName').value.trim().toLowerCase();
     const pin = document.getElementById('buyerPin').value.trim();
-    if (name.length > 2 && pin.length === 4) {
+    if (name.length > 2 && pin.length === 4 && cachedListingData?.reservations) {
         const idx = cachedListingData.reservations.findIndex(r => r.buyerName.toLowerCase() === name && r.buyerPin === pin);
         if (idx !== -1 && editingResIndex === null) window.openOrderModal(currentEditId, idx);
     }
@@ -229,7 +254,7 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         const q = parseFloat(span.innerText); if(q > 0) items.push({ name: span.dataset.name, qty: q });
     });
 
-    if(!name || !phone || pin.length !== 4 || items.length === 0) return alert("Uzupełnij dane kontaktowe i wybierz produkty!");
+    if(!name || !phone || pin.length !== 4 || items.length === 0) return alert("Uzupełnij dane!");
     
     localStorage.setItem('ryneczek_name', name); 
     localStorage.setItem('ryneczek_phone', phone);
@@ -245,7 +270,8 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         const existIdx = res.findIndex(r => r.buyerName.toLowerCase() === name.toLowerCase() && r.buyerPin === pin);
         if(existIdx !== -1) res[existIdx] = newData; else res.push(newData);
     }
-    await updateDoc(refL, { reservations: res }); location.reload();
+    await updateDoc(refL, { reservations: res }); 
+    location.reload();
 };
 
 // --- PANEL SPRZEDAWCY ---
@@ -263,37 +289,27 @@ const renderSellerView = (type) => {
     document.getElementById('view-by-product').classList.toggle('active', type === 'product');
 
     if (type === 'person') {
-        d.reservations.forEach((r, idx) => {
+        (d.reservations || []).forEach((r, idx) => {
             let pTotal = 0;
-            const itemsRows = r.items.map(i => {
+            const itemsRows = (r.items || []).map(i => {
                 const prod = d.items.find(pi => pi.name === i.name); const st = prod ? i.qty * prod.price : 0; pTotal += st;
                 return `<div class="res-item-line"><span>${i.name} (x${i.qty})</span> <b>${st.toFixed(2)} zł</b></div>`;
             }).join('');
             container.innerHTML += `<div class="res-card-ui">
-                <div class="res-card-header">
-                    <div>
-                        <b style="color:var(--accent); display:block;">👤 ${r.buyerName}</b>
-                        <small style="color:#94a3b8">📞 ${r.buyerPhone || 'Brak numeru'}</small>
-                    </div>
-                    <small>⏰ ${r.time}</small>
-                </div>
-                ${itemsRows}<div class="res-total-highlight">Do zapłaty: ${pTotal.toFixed(2)} zł</div>
-                <button onclick="window.openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; font-size:0.8rem; margin-top:10px">✏️ Edytuj zamówienie sąsiada</button>
+                <div class="res-card-header"><div><b>👤 ${r.buyerName}</b><br><small>📞 ${r.buyerPhone || ''}</small></div><small>⏰ ${r.time}</small></div>
+                ${itemsRows}<div class="res-total-highlight">Razem: ${pTotal.toFixed(2)} zł</div>
+                <button onclick="window.openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; font-size:0.8rem; margin-top:10px">✏️ Edytuj</button>
             </div>`;
         });
     } else {
         d.items.forEach(product => {
             let pGrand = 0; let tSold = 0;
-            const bRows = d.reservations.map(r => {
-                const f = r.items.find(i => i.name === product.name);
+            const bRows = (d.reservations || []).map(r => {
+                const f = r.items?.find(i => i.name === product.name);
                 if (f) { pGrand += f.qty * product.price; tSold += f.qty; return `<div class="res-item-line"><span>👤 ${r.buyerName}</span> <b>${f.qty} ${product.unit}</b></div>`; }
                 return '';
             }).join('');
-            container.innerHTML += `<div class="res-card-ui">
-                <div class="res-card-header"><b style="color:#a5b4fc">📦 ${product.name}</b><small>Sprzedano: ${tSold}/${product.totalQty}</small></div>
-                ${bRows || '<small style="opacity:0.5">Brak zamówień</small>'}
-                <div class="res-total-highlight">Suma: ${pGrand.toFixed(2)} zł</div>
-            </div>`;
+            container.innerHTML += `<div class="res-card-ui"><div class="res-card-header"><b>📦 ${product.name}</b><small>Sprzedano: ${tSold}/${product.totalQty}</small></div>${bRows}<div class="res-total-highlight">Suma: ${pGrand.toFixed(2)} zł</div></div>`;
         });
     }
 };
@@ -321,5 +337,5 @@ document.getElementById('btn-edit-offer').onclick = () => {
 };
 
 document.getElementById('btn-delete-offer').onclick = async () => {
-    if(confirm("Usunąć całe ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); }
+    if(confirm("Usunąć ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); }
 };
