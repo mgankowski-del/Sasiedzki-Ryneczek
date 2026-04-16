@@ -23,32 +23,72 @@ try {
     console.log("Messaging nieobsługiwany");
 }
 
-// Funkcja pomocnicza do pól produktów
+// --- NAPRAWA BŁĘDU Z LOGÓW ---
+// Wystawiamy funkcję do window, żeby HTML mógł ją wywołać przez onclick
+window.closeModals = () => {
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+};
+
+// Funkcja konwertująca VAPID (bezpieczna wersja)
+function urlBase64ToUint8Array(base64String) {
+    try {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    } catch (e) { return null; }
+}
+
+async function requestPushToken() {
+    if (!messaging) return null;
+    try {
+        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        await navigator.serviceWorker.ready;
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
+            return await getToken(messaging, { 
+                vapidKey: urlBase64ToUint8Array(vapidKey) || vapidKey, 
+                serviceWorkerRegistration: registration 
+            });
+        }
+    } catch (e) { console.error("Błąd Push:", e); }
+    return null;
+}
+
+// Funkcja tworząca pola produktu (zgodna z Twoim UI)
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     div.innerHTML = `
-        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
+        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" placeholder="Np. Truskawki" required></div>
         <div class="form-grid">
-            <div class="input-group"><label>Cena</label><input type="number" class="p-price" step="0.01" required></div>
-            <div class="input-group"><label>Jednostka</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
+            <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" required></div>
+            <div class="input-group"><label>Jednostka</label>
+                <select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select>
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="input-group"><label>Ilość (pula)</label><input type="number" class="p-total" step="0.1" required></div>
+            <div class="input-group"><label>Krok zamawiania</label>
+                <select class="p-step"><option value="1">1</option><option value="0.5">0.5</option></select>
+            </div>
         </div>
         <input type="file" class="p-file" accept="image/*">
     `;
     return div;
 };
 
-// --- START APLIKACJI ---
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Aplikacja startuje...");
+    console.log("Aplikacja wystartowała poprawnie.");
 
-    // 1. Obsługa otwierania modala
     const btnOpenAdd = document.getElementById('btn-open-add');
-    const modalAdd = document.getElementById('add-listing-modal');
-    
-    if (btnOpenAdd && modalAdd) {
+    if (btnOpenAdd) {
         btnOpenAdd.onclick = () => {
-            console.log("Kliknięto dodawanie");
             const form = document.getElementById('listing-form');
             if (form) form.reset();
             const productCont = document.getElementById('products-to-add');
@@ -56,55 +96,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 productCont.innerHTML = '';
                 productCont.appendChild(createProductFields());
             }
-            modalAdd.classList.remove('hidden');
+            document.getElementById('add-listing-modal')?.classList.remove('hidden');
         };
     }
 
-    // 2. Dodawanie kolejnych pól produktu
     const btnMore = document.getElementById('add-more-items');
     if (btnMore) {
         btnMore.onclick = () => {
-            const productCont = document.getElementById('products-to-add');
-            if (productCont) productCont.appendChild(createProductFields());
+            document.getElementById('products-to-add')?.appendChild(createProductFields());
         };
     }
 
-    // 3. Ładowanie ofert z bazy (Snapshot)
-    const listingsCont = document.getElementById('listings-container');
-    if (listingsCont) {
+    // Ładowanie listy ofert
+    const cont = document.getElementById('listings-container');
+    if (cont) {
         onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
-            listingsCont.innerHTML = '';
+            cont.innerHTML = '';
             snap.forEach(docSnap => {
                 const d = docSnap.data();
                 const card = document.createElement('div');
                 card.className = 'product-card';
                 card.innerHTML = `
                     <div class="listing-header">
-                        <h3>Odbiór u: ${d.sellerName || 'Anonim'}</h3>
-                        <p>📍 ${d.address || 'Brak adresu'}</p>
+                        <h3>Odbiór u: ${d.sellerName}</h3>
+                        <p>📍 ${d.address}</p>
                     </div>
                     <div class="card-footer">
-                        <button class="btn-primary-action" onclick="alert('Funkcja zamówień wkrótce')">🛒 Zamów</button>
+                        <button class="btn-primary-action" onclick="alert('Zamówienia wkrótce!')">🛒 Zamów</button>
                     </div>
                 `;
-                listingsCont.appendChild(card);
+                cont.appendChild(card);
             });
         });
     }
 });
 
-// 4. Wysyłanie formularza
+// Obsługa zapisu ogłoszenia
 const mainForm = document.getElementById('listing-form');
 if (mainForm) {
     mainForm.onsubmit = async (e) => {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerText = "Publikuję...";
-        }
+        btn.disabled = true;
+        btn.innerText = "Publikuję...";
 
         try {
+            const token = await requestPushToken();
             const products = [];
             for (const div of document.querySelectorAll('.product-form-box')) {
                 const file = div.querySelector('.p-file').files[0];
@@ -118,6 +155,8 @@ if (mainForm) {
                     name: div.querySelector('.p-name').value,
                     price: parseFloat(div.querySelector('.p-price').value),
                     unit: div.querySelector('.p-unit').value,
+                    totalQty: parseFloat(div.querySelector('.p-total').value),
+                    step: parseFloat(div.querySelector('.p-step').value),
                     imageUrl
                 });
             }
@@ -125,6 +164,7 @@ if (mainForm) {
             await addDoc(collection(db, "listings"), {
                 sellerName: document.getElementById('sellerName').value,
                 sellerPhone: document.getElementById('sellerPhone').value,
+                sellerToken: token || "",
                 address: document.getElementById('pickupAddress').value,
                 pickupTimes: document.getElementById('pickupTimes').value,
                 expiryDate: document.getElementById('expiryDate').value,
@@ -136,11 +176,8 @@ if (mainForm) {
 
             location.reload();
         } catch (err) {
-            alert("Błąd podczas publikacji: " + err.message);
-            if (btn) {
-                btn.disabled = false;
-                btn.innerText = "Opublikuj ogłoszenie";
-            }
+            alert("Błąd: " + err.message);
+            btn.disabled = false;
         }
     };
 }
