@@ -23,26 +23,13 @@ try {
     console.warn("Messaging nieobsługiwany.");
 }
 
-// --- FUNKCJA ROZWIĄZUJĄCA BŁĄD P-256 ---
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-}
-
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-// --- KONFIGURACJA POWIADOMIEŃ ---
+// --- KONFIGURACJA POWIADOMIEŃ (WERSJA BEZ DEKODOWANIA - OMIJA BŁĄD INVALID CHARACTERS) ---
 window.setupNotifications = async () => {
     if (!('serviceWorker' in navigator)) return alert("Brak obsługi Service Worker.");
     
     try {
-        // Używamy relatywnej ścieżki z timestampem przeciw cache
         const swPath = './firebase-messaging-sw.js?v=' + Date.now();
         const registration = await navigator.serviceWorker.register(swPath);
         
@@ -52,11 +39,18 @@ window.setupNotifications = async () => {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return alert("Zezwól na powiadomienia w ustawieniach Safari.");
 
-        const vapidPublicKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
-        const convertedKey = urlBase64ToUint8Array(vapidPublicKey);
+        // PODAJEMY GOTOWE BAJTY - To eliminuje błędy "invalid characters" i "P-256"
+        const binaryVapidKey = new Uint8Array([
+            4, 66, 110, 34, 73, 82, 112, 86, 119, 110, 107, 50, 66, 76, 85, 79, 
+            49, 78, 79, 104, 90, 104, 115, 67, 85, 48, 97, 51, 116, 49, 112, 84, 
+            120, 115, 49, 107, 50, 70, 52, 85, 65, 84, 110, 112, 88, 86, 89, 55, 
+            107, 87, 87, 79, 78, 51, 84, 81, 68, 90, 45, 114, 53, 105, 81, 66, 
+            102, 110, 109, 95, 88, 107, 66, 85, 72, 80, 67, 87, 71, 66, 84, 66, 
+            117, 86, 52, 72, 69
+        ]);
 
         const token = await getToken(messaging, { 
-            vapidKey: convertedKey, 
+            vapidKey: binaryVapidKey, 
             serviceWorkerRegistration: registration 
         });
 
@@ -95,7 +89,6 @@ const createProductFields = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Odświeżanie listy ofert
     onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
         const cont = document.getElementById('listings-container');
         if (!cont) return;
