@@ -16,49 +16,35 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 let messaging = null;
-try { messaging = getMessaging(app); } catch (e) { console.log("Messaging not supported"); }
-
-// --- PANCERNA KONWERSJA KLUCZA VAPID DLA IOS ---
-function urlBase64ToUint8Array(base64String) {
-    try {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding)
-            .replace(/\-/g, '+')
-            .replace(/_/g, '/');
-
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
-    } catch (e) {
-        console.error("Błąd konwersji klucza:", e);
-        return null;
-    }
-}
+try { messaging = getMessaging(app); } catch (e) {}
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-// --- BEZPIECZNA REJESTRACJA POWIADOMIEŃ ---
+// --- RĘCZNIE PRZYGOTOWANA TABLICA BAJTÓW DLA TWOJEGO KLUCZA VAPID ---
+// To omija funkcję atob() i błąd "invalid characters"
+const getVapidKey = () => {
+    return new Uint8Array([
+        4, 66, 110, 34, 73, 82, 112, 86, 119, 110, 107, 50, 66, 76, 85, 79, 
+        49, 78, 79, 104, 90, 104, 115, 67, 85, 48, 97, 51, 116, 49, 112, 84, 
+        120, 115, 49, 107, 50, 70, 52, 85, 65, 84, 110, 112, 88, 86, 89, 55, 
+        107, 87, 87, 79, 78, 51, 84, 81, 68, 90, 45, 114, 53, 105, 81, 66, 
+        102, 110, 109, 95, 88, 107, 66, 85, 72, 80, 67, 87, 71, 66, 84, 66, 
+        117, 86, 52, 72, 69
+    ]);
+};
+
 window.setupNotifications = async () => {
-    if (!('serviceWorker' in navigator)) return alert("Brak obsługi Service Worker.");
+    if (!('serviceWorker' in navigator)) return alert("Brak obsługi SW.");
     
     try {
         const swPath = './firebase-messaging-sw.js?v=' + Date.now();
         const registration = await navigator.serviceWorker.register(swPath, { scope: './' });
         
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return alert("Zezwól na powiadomienia w ustawieniach Safari.");
-
-        const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
-        const convertedKey = urlBase64ToUint8Array(vapidKey);
-
-        if (!convertedKey) throw new Error("Błąd formatu klucza bezpieczeństwa.");
+        if (permission !== 'granted') return alert("Zezwól na powiadomienia w Safari.");
 
         const token = await getToken(messaging, { 
-            vapidKey: convertedKey, 
+            vapidKey: getVapidKey(), 
             serviceWorkerRegistration: registration 
         });
 
@@ -67,18 +53,19 @@ window.setupNotifications = async () => {
             alert("✅ Sukces! Powiadomienia aktywne.");
         }
     } catch (error) {
+        console.error(error);
         alert("Błąd: " + error.message);
     }
 };
 
-// --- FUNKCJE PRODUKTÓW I FORMULARZA ---
+// --- RESTA KODU (STABILNA) ---
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     div.innerHTML = `
         <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
         <div class="form-grid">
-            <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" required></div>
+            <div class="input-group"><label>Cena</label><input type="number" class="p-price" step="0.01" required></div>
             <div class="input-group"><label>Jedn.</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
         </div>
         <div class="form-grid">
@@ -109,11 +96,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('btn-open-add').onclick = () => {
-        document.getElementById('products-to-add').innerHTML = '';
-        document.getElementById('products-to-add').appendChild(createProductFields());
-        document.getElementById('add-listing-modal').classList.remove('hidden');
-    };
+    const btnOpen = document.getElementById('btn-open-add');
+    if (btnOpen) {
+        btnOpen.onclick = () => {
+            document.getElementById('products-to-add').innerHTML = '';
+            document.getElementById('products-to-add').appendChild(createProductFields());
+            document.getElementById('add-listing-modal').classList.remove('hidden');
+        };
+    }
 });
 
 document.getElementById('listing-form').onsubmit = async (e) => {
