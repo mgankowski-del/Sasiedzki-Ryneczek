@@ -19,17 +19,13 @@ let messaging = null;
 
 try {
     messaging = getMessaging(app);
-} catch (e) {
-    console.log("Messaging nieobsługiwany");
-}
+} catch (e) { console.log("Messaging nieobsługiwany"); }
 
-// --- NAPRAWA BŁĘDU Z LOGÓW ---
-// Wystawiamy funkcję do window, żeby HTML mógł ją wywołać przez onclick
+// Globalna funkcja do zamykania modali (naprawa błędu z konsoli)
 window.closeModals = () => {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 };
 
-// Funkcja konwertująca VAPID (bezpieczna wersja)
 function urlBase64ToUint8Array(base64String) {
     try {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -56,36 +52,44 @@ async function requestPushToken() {
                 serviceWorkerRegistration: registration 
             });
         }
-    } catch (e) { console.error("Błąd Push:", e); }
+    } catch (e) { console.error("Push Error:", e); }
     return null;
 }
 
-// Funkcja tworząca pola produktu (zgodna z Twoim UI)
+// --- POPRAWIONA FUNKCJA TWORZENIA PÓL PRODUKTU ---
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     div.innerHTML = `
-        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" placeholder="Np. Truskawki" required></div>
+        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" placeholder="Np. Jajka wiejskie" required></div>
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" required></div>
             <div class="input-group"><label>Jednostka</label>
-                <select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select>
+                <select class="p-unit">
+                    <option value="szt">szt.</option>
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                </select>
             </div>
         </div>
         <div class="form-grid">
-            <div class="input-group"><label>Ilość (pula)</label><input type="number" class="p-total" step="0.1" required></div>
+            <div class="input-group"><label>Łączna ilość (pula)</label><input type="number" class="p-total" step="0.01" required></div>
             <div class="input-group"><label>Krok zamawiania</label>
-                <select class="p-step"><option value="1">1</option><option value="0.5">0.5</option></select>
+                <select class="p-step">
+                    <option value="1">1</option>
+                    <option value="0.5">0.5</option>
+                    <option value="0.25">0.25</option>
+                    <option value="100">100 (dla gramów)</option>
+                </select>
             </div>
         </div>
-        <input type="file" class="p-file" accept="image/*">
+        <input type="file" class="p-file" accept="image/*" style="margin-top:10px;">
     `;
     return div;
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Aplikacja wystartowała poprawnie.");
-
+    // Obsługa otwierania okna nowej oferty
     const btnOpenAdd = document.getElementById('btn-open-add');
     if (btnOpenAdd) {
         btnOpenAdd.onclick = () => {
@@ -100,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // Dodawanie kolejnego produktu w formularzu
     const btnMore = document.getElementById('add-more-items');
     if (btnMore) {
         btnMore.onclick = () => {
@@ -107,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Ładowanie listy ofert
+    // Odświeżanie listy ofert na stronie głównej
     const cont = document.getElementById('listings-container');
     if (cont) {
         onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
@@ -120,9 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="listing-header">
                         <h3>Odbiór u: ${d.sellerName}</h3>
                         <p>📍 ${d.address}</p>
+                        <p>⏰ ${d.pickupTimes}</p>
                     </div>
                     <div class="card-footer">
-                        <button class="btn-primary-action" onclick="alert('Zamówienia wkrótce!')">🛒 Zamów</button>
+                        <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
+                        <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
                     </div>
                 `;
                 cont.appendChild(card);
@@ -131,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Obsługa zapisu ogłoszenia
+// --- OBSŁUGA WYSYŁKI FORMULARZA ---
 const mainForm = document.getElementById('listing-form');
 if (mainForm) {
     mainForm.onsubmit = async (e) => {
@@ -143,7 +150,9 @@ if (mainForm) {
         try {
             const token = await requestPushToken();
             const products = [];
-            for (const div of document.querySelectorAll('.product-form-box')) {
+            const productBoxes = document.querySelectorAll('.product-form-box');
+
+            for (const div of productBoxes) {
                 const file = div.querySelector('.p-file').files[0];
                 let imageUrl = "";
                 if (file) {
@@ -157,7 +166,7 @@ if (mainForm) {
                     unit: div.querySelector('.p-unit').value,
                     totalQty: parseFloat(div.querySelector('.p-total').value),
                     step: parseFloat(div.querySelector('.p-step').value),
-                    imageUrl
+                    imageUrl: imageUrl
                 });
             }
 
@@ -176,8 +185,9 @@ if (mainForm) {
 
             location.reload();
         } catch (err) {
-            alert("Błąd: " + err.message);
+            alert("Wystąpił błąd: " + err.message);
             btn.disabled = false;
+            btn.innerText = "Opublikuj ofertę";
         }
     };
 }
