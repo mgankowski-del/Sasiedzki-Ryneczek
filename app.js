@@ -44,34 +44,34 @@ window.setupNotifications = async () => {
     }
 
     try {
-        // PEŁNA ŚCIEŻKA DO TWOJEGO REPOZYTORIUM
-        const swUrl = 'https://mgankowski-del.github.io/Sasiedzki-Ryneczek/firebase-messaging-sw.js';
+        // Używamy prostej, relatywnej ścieżki, którą Safari najlepiej rozumie
+        // Dodajemy tylko timestamp, żeby ominąć cache
+        const swPath = './firebase-messaging-sw.js?t=' + Date.now();
         
-        console.log("Próba rejestracji SW z adresu:", swUrl);
-        
-        const registration = await navigator.serviceWorker.register(swUrl, {
-            scope: '/Sasiedzki-Ryneczek/'
-        });
+        console.log("Rejestracja SW...");
+        const registration = await navigator.serviceWorker.register(swPath);
+
+        // Czekamy chwilę, aż SW będzie gotowy (kluczowe na iOS!)
+        await navigator.serviceWorker.ready;
 
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
             return alert("Musisz zezwolić na powiadomienia w ustawieniach Safari.");
         }
 
+        // Używamy klucza VAPID bezpośrednio jako tekst - Firebase sam go sobie 
+        // przeliczy, a my unikniemy błędów w naszych funkcjach konwertujących
         const token = await getToken(messaging, {
-            vapidKey: getVapidKeyArray(),
+            vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
             serviceWorkerRegistration: registration
         });
 
         if (token) {
             localStorage.setItem('ryneczek_push_token', token);
             alert("✅ Sukces! Powiadomienia aktywne.");
-            console.log("Token:", token);
-        } else {
-            alert("Nie udało się uzyskać tokena. Sprawdź konsolę.");
         }
     } catch (error) {
-        console.error("Błąd szczegółowy:", error);
+        console.error("Błąd:", error);
         alert("Błąd: " + error.message);
     }
 };
