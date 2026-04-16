@@ -23,49 +23,34 @@ try {
     console.log("FCM nieobsługiwane");
 }
 
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-}
-
-async function requestPermission() {
+async function getPushToken() {
     if (!messaging) return null;
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        // Czekamy aż SW będzie aktywny
+        await navigator.serviceWorker.ready;
+
         const permission = await Notification.requestPermission();
-        
         if (permission === 'granted') {
-            const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
-            const convertedKey = urlBase64ToUint8Array(vapidKey);
-            
-            return await getToken(messaging, { 
-                vapidKey: convertedKey, 
+            const token = await getToken(messaging, { 
+                vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
                 serviceWorkerRegistration: registration 
             });
+            if (token) return token;
+        } else {
+            alert("Brak zgody na powiadomienia w ustawieniach iPhone!");
         }
-    } catch (error) { 
-        console.error("Błąd tokena:", error);
+    } catch (error) {
+        alert("Błąd krytyczny tokena: " + error.message);
     }
     return null;
 }
 
-let currentEditId = null;
-let editingResIndex = null;
-let cachedListingData = null;
-let isEditingOffer = false;
-
-// --- NAPRAWIONE OTWIERANIE OKNA ---
+// Reszta logiki UI
 document.addEventListener('DOMContentLoaded', () => {
     const btnOpenAdd = document.getElementById('btn-open-add');
     if (btnOpenAdd) {
         btnOpenAdd.onclick = () => {
-            isEditingOffer = false;
             document.getElementById('modal-title').innerText = "Nowa oferta";
             document.getElementById('listing-form').reset();
             document.getElementById('products-to-add').innerHTML = '';
@@ -73,127 +58,88 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('add-listing-modal').classList.remove('hidden');
         };
     }
-
-    const addMoreBtn = document.getElementById('add-more-items');
-    if (addMoreBtn) {
-        addMoreBtn.onclick = () => {
-            document.getElementById('products-to-add').appendChild(createProductFields());
-        };
-    }
 });
 
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
-    const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
         <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
             <div class="input-group"><label>Jednostka</label>
-                <select class="p-unit"><option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option><option value="kg" ${data.unit==='kg'?'selected':''}>kg</option><option value="g" ${data.unit==='g'?'selected':''}>g</option></select>
+                <select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select>
             </div>
         </div>
-        <div class="form-grid">
-            <div class="input-group"><label>Łączna ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
-            <div class="input-group"><label>Krok</label>
-                <select class="p-step">
-                    <option value="1" ${initialStep==1?'selected':''}>1</option>
-                    <option value="0.5" ${initialStep==0.5?'selected':''}>0.5</option>
-                    <option value="0.25" ${initialStep==0.25?'selected':''}>0.25</option>
-                </select>
-            </div>
-        </div>
-        <input type="file" class="p-file" accept="image/*" style="margin-top:10px;">
+        <div class="input-group"><label>Ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+        <input type="file" class="p-file" accept="image/*">
     `;
     return div;
 };
 
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
-    const btn = document.getElementById('submitBtn'); 
+    const btn = document.getElementById('submitBtn');
     btn.disabled = true;
-    btn.innerText = "Publikowanie...";
+    btn.innerText = "Autoryzacja powiadomień...";
 
-    // Próba pobrania tokena dopiero tutaj
-    let token = localStorage.getItem('ryneczek_push_token');
+    // WYMUSZAMY POBRANIE TOKENA - jeśli nie wyjdzie, przerywamy z informacją
+    const token = await getPushToken();
+    
     if (!token) {
-        token = await requestPermission();
-        if (token) localStorage.setItem('ryneczek_push_token', token);
+        const cont = confirm("Nie udało się pobrać tokena powiadomień. Czy mimo to opublikować ogłoszenie? (Nie będziesz dostawać powiadomień push)");
+        if (!cont) {
+            btn.disabled = false;
+            btn.innerText = "Opublikuj ogłoszenie";
+            return;
+        }
     }
 
+    btn.innerText = "Wysyłanie danych...";
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
-        let imageUrl = div.dataset.oldUrl || "";
+        let imageUrl = "";
         if (file) {
             const sRef = ref(storage, `products/${Date.now()}_${file.name}`);
-            await uploadBytes(sRef, file); 
+            await uploadBytes(sRef, file);
             imageUrl = await getDownloadURL(sRef);
         }
         products.push({
-            name: div.querySelector('.p-name').value, 
+            name: div.querySelector('.p-name').value,
             price: parseFloat(div.querySelector('.p-price').value),
-            unit: div.querySelector('.p-unit').value, 
+            unit: div.querySelector('.p-unit').value,
             totalQty: parseFloat(div.querySelector('.p-total').value),
-            step: parseFloat(div.querySelector('.p-step').value), 
+            step: 1,
             imageUrl
         });
     }
 
-    const data = {
-        sellerName: document.getElementById('sellerName').value, 
+    await addDoc(collection(db, "listings"), {
+        sellerName: document.getElementById('sellerName').value,
         sellerPhone: document.getElementById('sellerPhone').value,
-        sellerToken: token || "", 
+        sellerToken: token || "",
         address: document.getElementById('pickupAddress').value,
-        pickupTimes: document.getElementById('pickupTimes').value, 
+        pickupTimes: document.getElementById('pickupTimes').value,
         expiryDate: document.getElementById('expiryDate').value,
-        pin: document.getElementById('pin').value, 
-        items: products, 
-        updatedAt: new Date(), 
-        reservations: cachedListingData?.reservations || []
-    };
+        pin: document.getElementById('pin').value,
+        items: products,
+        createdAt: new Date(),
+        reservations: []
+    });
 
-    if(isEditingOffer) await updateDoc(doc(db, "listings", currentEditId), data);
-    else { 
-        data.createdAt = new Date(); 
-        await addDoc(collection(db, "listings"), data); 
-    }
     location.reload();
 };
 
-// --- SNAPSOT I RESZTA FUNKCJI BEZ ZMIAN ---
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
     cont.innerHTML = '';
     snap.forEach(docSnap => {
         const d = docSnap.data();
-        const card = document.createElement('div'); 
+        const card = document.createElement('div');
         card.className = 'product-card';
-        card.innerHTML = `
-            <div class="listing-header">
-                <h3>Odbiór u: ${d.sellerName}</h3>
-                <p>📍 ${d.address} | 📞 ${d.sellerPhone || ''}</p>
-                <p>⏰ ${d.pickupTimes}</p>
-            </div>
-            ${(d.items || []).map(it => {
-                return `<div class="product-item-list"><b>${it.name}</b> - ${it.price} zł</div>`;
-            }).join('')}
-            <div class="card-footer">
-                <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
-                <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
-            </div>
-        `;
+        card.innerHTML = `<h3>${d.sellerName}</h3><p>${d.address}</p>`;
         cont.appendChild(card);
     });
 });
-
-window.authSeller = async (id, pin) => {
-    const inputPin = prompt("PIN:");
-    if(inputPin !== pin) return;
-    currentEditId = id; 
-    const snap = await getDoc(doc(db, "listings", id)); 
-    cachedListingData = snap.data();
-    document.getElementById('seller-modal').classList.remove('hidden');
-};
