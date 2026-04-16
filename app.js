@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+// Zmiana na wersję kompatybilną dla Messaging
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
@@ -15,50 +16,36 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
-let messaging = null;
-
-if ('Notification' in window && 'serviceWorker' in navigator) {
-    try { messaging = getMessaging(app); } catch (e) { console.log("Messaging nieobsługiwany."); }
-}
+const messaging = getMessaging(app);
 
 let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- DIAGNOSTYCZNA FUNKCJA TOKENA ---
+// --- NOWA FUNKCJA POBIERANIA TOKENA ---
 async function requestPermission() {
-    if (!messaging) {
-        alert("Błąd: Messaging nie zainicjalizowany!");
-        return null;
-    }
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
-            // Pętla czekająca na token
-            for (let i = 0; i < 5; i++) {
-                try {
-                    const token = await getToken(messaging, { 
-                        vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
-                        serviceWorkerRegistration: registration 
-                    });
-                    if (token) {
-                        localStorage.setItem('ryneczek_push_token', token);
-                        return token;
-                    }
-                } catch (tokenErr) {
-                    console.log("Próba " + i + " nieudana: ", tokenErr);
-                }
-                await new Promise(r => setTimeout(r, 1000));
+            // Próbujemy pobrać token - zmieniona konfiguracja
+            const token = await getToken(messaging, { 
+                vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
+                serviceWorkerRegistration: registration 
+            });
+
+            if (token) {
+                console.log("Token pobrany:", token);
+                localStorage.setItem('ryneczek_push_token', token);
+                return token;
             }
-            alert("Błąd: Zgoda jest, ale Firebase nie wydał tokena po 5 sekundach.");
         } else {
-            alert("Błąd: Brak zgody użytkownika! Stan: " + permission);
+            alert("Brak zgody na powiadomienia w systemie.");
         }
     } catch (error) { 
-        alert("BŁĄD KRYTYCZNY: " + error.message);
+        alert("Błąd pobierania tokena: " + error.message);
     }
     return null;
 }
@@ -131,12 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn'); btn.disabled = true;
-    const originalText = btn.innerText;
-    btn.innerText = "Sprawdzam powiadomienia...";
+    btn.innerText = "Pobieram token...";
 
     const token = await requestPermission();
 
-    btn.innerText = "Wysyłam zdjęcia...";
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
