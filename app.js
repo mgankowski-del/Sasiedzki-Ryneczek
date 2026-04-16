@@ -21,7 +21,6 @@ try {
     messaging = getMessaging(app);
 } catch (e) { console.log("Messaging nieobsługiwany"); }
 
-// Globalna funkcja do zamykania modali (naprawa błędu z konsoli)
 window.closeModals = () => {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 };
@@ -39,24 +38,33 @@ function urlBase64ToUint8Array(base64String) {
     } catch (e) { return null; }
 }
 
+// --- FUNKCJA POBIERANIA TOKENA ---
 async function requestPushToken() {
     if (!messaging) return null;
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         await navigator.serviceWorker.ready;
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
+        
+        // Na iPhone sprawdzamy najpierw czy mamy już zgodę
+        if (Notification.permission === 'default') {
+            await Notification.requestPermission();
+        }
+
+        if (Notification.permission === 'granted') {
             const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
-            return await getToken(messaging, { 
+            const token = await getToken(messaging, { 
                 vapidKey: urlBase64ToUint8Array(vapidKey) || vapidKey, 
                 serviceWorkerRegistration: registration 
             });
+            if (token) {
+                localStorage.setItem('ryneczek_push_token', token);
+                return token;
+            }
         }
     } catch (e) { console.error("Push Error:", e); }
-    return null;
+    return localStorage.getItem('ryneczek_push_token') || "";
 }
 
-// --- POPRAWIONA FUNKCJA TWORZENIA PÓL PRODUKTU ---
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
@@ -65,22 +73,13 @@ const createProductFields = () => {
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" required></div>
             <div class="input-group"><label>Jednostka</label>
-                <select class="p-unit">
-                    <option value="szt">szt.</option>
-                    <option value="kg">kg</option>
-                    <option value="g">g</option>
-                </select>
+                <select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option><option value="g">g</option></select>
             </div>
         </div>
         <div class="form-grid">
             <div class="input-group"><label>Łączna ilość (pula)</label><input type="number" class="p-total" step="0.01" required></div>
             <div class="input-group"><label>Krok zamawiania</label>
-                <select class="p-step">
-                    <option value="1">1</option>
-                    <option value="0.5">0.5</option>
-                    <option value="0.25">0.25</option>
-                    <option value="100">100 (dla gramów)</option>
-                </select>
+                <select class="p-step"><option value="1">1</option><option value="0.5">0.5</option><option value="0.25">0.25</option><option value="100">100 (g)</option></select>
             </div>
         </div>
         <input type="file" class="p-file" accept="image/*" style="margin-top:10px;">
@@ -89,7 +88,9 @@ const createProductFields = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Obsługa otwierania okna nowej oferty
+    // Próba cichego pobrania tokena przy starcie (dla iPhone)
+    requestPushToken();
+
     const btnOpenAdd = document.getElementById('btn-open-add');
     if (btnOpenAdd) {
         btnOpenAdd.onclick = () => {
@@ -104,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Dodawanie kolejnego produktu w formularzu
     const btnMore = document.getElementById('add-more-items');
     if (btnMore) {
         btnMore.onclick = () => {
@@ -112,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Odświeżanie listy ofert na stronie głównej
     const cont = document.getElementById('listings-container');
     if (cont) {
         onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
@@ -125,7 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="listing-header">
                         <h3>Odbiór u: ${d.sellerName}</h3>
                         <p>📍 ${d.address}</p>
-                        <p>⏰ ${d.pickupTimes}</p>
                     </div>
                     <div class="card-footer">
                         <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
@@ -138,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- OBSŁUGA WYSYŁKI FORMULARZA ---
 const mainForm = document.getElementById('listing-form');
 if (mainForm) {
     mainForm.onsubmit = async (e) => {
@@ -148,11 +145,11 @@ if (mainForm) {
         btn.innerText = "Publikuję...";
 
         try {
+            // Ponowna próba pobrania tokena przy wysyłce
             const token = await requestPushToken();
+            
             const products = [];
-            const productBoxes = document.querySelectorAll('.product-form-box');
-
-            for (const div of productBoxes) {
+            for (const div of document.querySelectorAll('.product-form-box')) {
                 const file = div.querySelector('.p-file').files[0];
                 let imageUrl = "";
                 if (file) {
@@ -185,9 +182,8 @@ if (mainForm) {
 
             location.reload();
         } catch (err) {
-            alert("Wystąpił błąd: " + err.message);
+            alert("Błąd: " + err.message);
             btn.disabled = false;
-            btn.innerText = "Opublikuj ofertę";
         }
     };
 }
