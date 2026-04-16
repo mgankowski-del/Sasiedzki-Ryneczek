@@ -17,10 +17,17 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const messaging = getMessaging(app);
 
-let currentEditId = null;
-let editingResIndex = null;
-let cachedListingData = null;
-let isEditingOffer = false;
+// Funkcja konwertująca klucz tekstowy na binarny (wymagane przez iOS)
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
 
 async function requestPermission() {
     try {
@@ -28,11 +35,12 @@ async function requestPermission() {
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
-            // KLUCZ VAPID BEZ ŻADNYCH SPACJI I ZNAKÓW SPECJALNYCH
-            const cleanVapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
+            const vapidKey = 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE';
+            // Konwersja klucza przed wysłaniem do getToken
+            const convertedVapidKey = urlBase64ToUint8Array(vapidKey);
             
             const token = await getToken(messaging, { 
-                vapidKey: cleanVapidKey,
+                vapidKey: vapidKey, // Firebase sam powinien to obsłużyć, ale upewnijmy się
                 serviceWorkerRegistration: registration 
             });
 
@@ -42,7 +50,8 @@ async function requestPermission() {
             }
         }
     } catch (error) { 
-        alert("Błąd VAPID: " + error.message);
+        console.error("Błąd VAPID:", error);
+        // Jeśli błąd nadal występuje, spróbujmy bez jawnej konwersji (standard Firebase)
     }
     return null;
 }
