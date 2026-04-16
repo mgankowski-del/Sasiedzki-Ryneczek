@@ -26,20 +26,24 @@ let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- POPRAWIONA FUNKCJA POBIERANIA TOKENA ---
 async function requestPermission() {
     if (!messaging) return null;
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-            const token = await getToken(messaging, { 
-                vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
-                serviceWorkerRegistration: registration 
-            });
-            if (token) {
-                localStorage.setItem('ryneczek_push_token', token);
-                return token;
+            // Próbujemy pobrać token (pętla 5-sekundowa dla iPhone)
+            for (let i = 0; i < 5; i++) {
+                const token = await getToken(messaging, { 
+                    vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
+                    serviceWorkerRegistration: registration 
+                });
+                if (token) {
+                    localStorage.setItem('ryneczek_push_token', token);
+                    return token;
+                }
+                console.log("Czekam na token...");
+                await new Promise(r => setTimeout(r, 1000));
             }
         }
     } catch (error) { console.error("Błąd tokena:", error); }
@@ -111,13 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-more-items').onclick = () => document.getElementById('products-to-add').appendChild(createProductFields());
 });
 
-// --- KLUCZOWA ZMIANA: CZEKAMY NA TOKEN PRZY WYSYŁCE ---
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn'); btn.disabled = true;
-    btn.innerText = "Pobieranie uprawnień...";
+    const originalText = btn.innerText;
+    btn.innerText = "Trwa publikacja...";
 
-    // WYMUSZAMY POBRANIE TOKENA PRZED ZAPISEM
+    // Czekamy na token - kluczowe dla iPhone
     const token = await requestPermission();
 
     const products = [];
