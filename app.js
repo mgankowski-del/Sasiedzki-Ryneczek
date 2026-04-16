@@ -33,38 +33,42 @@ window.closeModals = () => {
 
 // --- Uproszczona, standardowa funkcja powiadomień ---
 window.setupNotifications = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        return alert("Twoja przeglądarka nie obsługuje powiadomień Push.");
+    if (!('serviceWorker' in navigator)) {
+        return alert("Twoja przeglądarka nie obsługuje Service Workerów.");
     }
     
     try {
-        // 1. Rejestracja SW (jeśli jeszcze nie ma)
-        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js?v=1');
-        console.log('SW zarejestrowany');
+        // 1. Rejestrujemy SW ręcznie z jawną ścieżką
+        // Dodajemy timestamp (?t=...), żeby iPhone ZA KAŻDYM RAZEM pobierał świeży plik
+        const swPath = './firebase-messaging-sw.js?t=' + Date.now();
+        const registration = await navigator.serviceWorker.register(swPath, {
+            scope: './' // To mówi przeglądarce, że SW ma dostęp do całego folderu
+        });
+        
+        console.log('Service Worker zarejestrowany poprawnie:', registration);
 
-        // 2. Prośba o uprawnienia (standardowe okno iOS)
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-            return alert("Musisz zezwolić na powiadomienia w ustawieniach.");
+            return alert("Musisz zezwolić na powiadomienia w ustawieniach Safari.");
         }
 
-        // 3. Pobranie tokena Firebase - wersja "Pure String"
-        // iOS 17.4+ często lepiej radzi sobie z czystym tekstem niż z Uint8Array
+        // 2. Pobieramy token, ale PRZEKAZUJEMY MU jawnie naszą rejestrację
+        // To jest klucz do sukcesu na iPhone
         const token = await getToken(messaging, { 
-            vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE'
-            // Usunąłem jawne podawanie registration, Firebase sam je znajdzie
+            vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
+            serviceWorkerRegistration: registration 
         });
 
         if (token) {
             localStorage.setItem('ryneczek_push_token', token);
             alert("✅ Sukces! Powiadomienia aktywne.");
-            console.log("Token:", token);
         } else {
-            alert("Nie udało się wygenerować tokena. Spróbuj odświeżyć stronę.");
+            alert("Token nie został wygenerowany. Spróbuj odświeżyć.");
         }
     } catch (error) {
-        console.error("Błąd szczegółowy:", error);
-        alert("Błąd: " + error.message);
+        console.error("Szczegóły błędu:", error);
+        // Wyświetlamy dokładniejszy komunikat błędu
+        alert("Błąd rejestracji: " + error.message);
     }
 };
 
