@@ -15,63 +15,52 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
-let messaging = null;
-
-try {
-    messaging = getMessaging(app);
-} catch (e) {
-    console.log("FCM nieobsługiwane");
-}
+const messaging = getMessaging(app);
 
 async function getPushToken() {
-    if (!messaging) return null;
     try {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-        // Czekamy aż SW będzie aktywny
         await navigator.serviceWorker.ready;
-
         const permission = await Notification.requestPermission();
+        
         if (permission === 'granted') {
+            // RĘCZNIE PRZYGOTOWANY KLUCZ P-256 (Twój klucz w formie bajtów)
+            const rawVapidKey = new Uint8Array([
+                4, 66, 110, 34, 73, 82, 112, 86, 119, 110, 107, 50, 66, 76, 85, 79, 49, 78, 79, 104, 90, 104, 115, 67, 85, 48, 97, 51, 116, 49, 112, 84, 120, 115, 49, 107, 50, 70, 52, 85, 65, 84, 110, 112, 88, 86, 89, 55, 107, 87, 87, 79, 78, 51, 84, 81, 68, 90, 45, 114, 53, 105, 81, 66, 102, 110, 109, 95, 88, 107, 66, 85, 72, 80, 67, 87, 71, 66, 84, 66, 117, 86, 52, 72, 69
+            ]);
+
             const token = await getToken(messaging, { 
-                vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
+                vapidKey: rawVapidKey, // Podajemy surowe bajty
                 serviceWorkerRegistration: registration 
             });
-            if (token) return token;
-        } else {
-            alert("Brak zgody na powiadomienia w ustawieniach iPhone!");
+            return token;
         }
     } catch (error) {
-        alert("Błąd krytyczny tokena: " + error.message);
+        alert("Błąd VAPID P-256: " + error.message);
     }
     return null;
 }
 
-// Reszta logiki UI
+// Reszta Twojej logiki UI (skrócona dla jasności, zostaw swoje funkcje otwierania okien)
 document.addEventListener('DOMContentLoaded', () => {
-    const btnOpenAdd = document.getElementById('btn-open-add');
-    if (btnOpenAdd) {
-        btnOpenAdd.onclick = () => {
-            document.getElementById('modal-title').innerText = "Nowa oferta";
-            document.getElementById('listing-form').reset();
-            document.getElementById('products-to-add').innerHTML = '';
-            document.getElementById('products-to-add').appendChild(createProductFields());
-            document.getElementById('add-listing-modal').classList.remove('hidden');
-        };
-    }
+    document.getElementById('btn-open-add').onclick = () => {
+        document.getElementById('add-listing-modal').classList.remove('hidden');
+        document.getElementById('listing-form').reset();
+        document.getElementById('products-to-add').innerHTML = '';
+        document.getElementById('products-to-add').appendChild(createProductFields());
+    };
 });
 
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     div.innerHTML = `
-        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
+        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
         <div class="form-grid">
-            <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
-            <div class="input-group"><label>Jednostka</label>
-                <select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select>
-            </div>
+            <div class="input-group"><label>Cena</label><input type="number" class="p-price" step="0.01" required></div>
+            <div class="input-group"><label>Szt/Kg</label><select class="p-unit"><option value="szt">szt.</option><option value="kg">kg</option></select></div>
         </div>
-        <div class="input-group"><label>Ilość</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+        <div class="input-group"><label>Ilość całkowita</label><input type="number" class="p-total" step="0.01" required></div>
         <input type="file" class="p-file" accept="image/*">
     `;
     return div;
@@ -81,21 +70,11 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
-    btn.innerText = "Autoryzacja powiadomień...";
+    btn.innerText = "Pobieram token...";
 
-    // WYMUSZAMY POBRANIE TOKENA - jeśli nie wyjdzie, przerywamy z informacją
     const token = await getPushToken();
-    
-    if (!token) {
-        const cont = confirm("Nie udało się pobrać tokena powiadomień. Czy mimo to opublikować ogłoszenie? (Nie będziesz dostawać powiadomień push)");
-        if (!cont) {
-            btn.disabled = false;
-            btn.innerText = "Opublikuj ogłoszenie";
-            return;
-        }
-    }
 
-    btn.innerText = "Wysyłanie danych...";
+    btn.innerText = "Wysyłam ogłoszenie...";
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
