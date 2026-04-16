@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyD_cuGXokb55W6W4aB-QkV0c_jAqXkJQgk",
@@ -14,13 +15,48 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
+let messaging = null;
+
+// Bezpieczna inicjalizacja messaging
+try { 
+    messaging = getMessaging(app); 
+} catch (e) { 
+    console.log("Powiadomienia push nie są wspierane w tej przeglądarce."); 
+}
 
 let currentEditId = null;
 let cachedListingData = null;
 
-// Rejestracja funkcji w window, aby przyciski w HTML działały
 window.closeModals = () => {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+};
+
+// --- IZOLOWANA FUNKCJA POWIADOMIEŃ ---
+window.setupNotifications = async () => {
+    if (!messaging) return alert("Twoja przeglądarka nie obsługuje powiadomień.");
+    
+    try {
+        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        await navigator.serviceWorker.ready;
+        const permission = await Notification.requestPermission();
+        
+        if (permission === 'granted') {
+            const token = await getToken(messaging, { 
+                vapidKey: 'BEprJIVRpVwnk2BLUO1NOhZhsCU0a3t1pTxs1k2F4UATnpXVY7kWWON3TQDZ-r5iQBfnm_XkBUHPCWGBTBuV4HE',
+                serviceWorkerRegistration: registration 
+            });
+            if (token) {
+                localStorage.setItem('ryneczek_push_token', token);
+                alert("Powiadomienia włączone pomyślnie!");
+                console.log("Token:", token);
+            }
+        } else {
+            alert("Brak zgody na powiadomienia.");
+        }
+    } catch (error) {
+        console.error("Błąd powiadomień:", error);
+        alert("Nie udało się skonfigurować powiadomień, ale możesz nadal korzystać z aplikacji.");
+    }
 };
 
 const createProductFields = () => {
@@ -45,7 +81,6 @@ const createProductFields = () => {
     return div;
 };
 
-// --- ŁADOWANIE OFERT ---
 document.addEventListener('DOMContentLoaded', () => {
     const listingsCont = document.getElementById('listings-container');
     
@@ -55,14 +90,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const d = docSnap.data();
             const card = document.createElement('div');
             card.className = 'product-card';
-            
             let productsHtml = (d.items || []).map(it => `
                 <div class="product-item-list">
                     <img src="${it.imageUrl || 'https://via.placeholder.com/50'}" class="thumb">
-                    <div>
-                        <b>${it.name}</b><br>
-                        <small>${it.price} zł / ${it.unit}</small>
-                    </div>
+                    <div><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small></div>
                 </div>
             `).join('');
 
@@ -82,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Przycisk otwierania modala
     document.getElementById('btn-open-add').onclick = () => {
         document.getElementById('listing-form').reset();
         document.getElementById('products-to-add').innerHTML = '';
@@ -95,57 +125,59 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 });
 
-// --- ZAPIS OFERTY ---
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.innerText = "Publikuję...";
 
-    const products = [];
-    for (const div of document.querySelectorAll('.product-form-box')) {
-        const file = div.querySelector('.p-file').files[0];
-        let imageUrl = "";
-        if (file) {
-            const sRef = ref(storage, `products/${Date.now()}_${file.name}`);
-            await uploadBytes(sRef, file);
-            imageUrl = await getDownloadURL(sRef);
+    try {
+        const products = [];
+        for (const div of document.querySelectorAll('.product-form-box')) {
+            const file = div.querySelector('.p-file').files[0];
+            let imageUrl = "";
+            if (file) {
+                const sRef = ref(storage, `products/${Date.now()}_${file.name}`);
+                await uploadBytes(sRef, file);
+                imageUrl = await getDownloadURL(sRef);
+            }
+            products.push({
+                name: div.querySelector('.p-name').value,
+                price: parseFloat(div.querySelector('.p-price').value),
+                unit: div.querySelector('.p-unit').value,
+                totalQty: parseFloat(div.querySelector('.p-total').value),
+                step: parseFloat(div.querySelector('.p-step').value),
+                imageUrl
+            });
         }
-        products.push({
-            name: div.querySelector('.p-name').value,
-            price: parseFloat(div.querySelector('.p-price').value),
-            unit: div.querySelector('.p-unit').value,
-            totalQty: parseFloat(div.querySelector('.p-total').value),
-            step: parseFloat(div.querySelector('.p-step').value),
-            imageUrl
+
+        await addDoc(collection(db, "listings"), {
+            sellerName: document.getElementById('sellerName').value,
+            sellerPhone: document.getElementById('sellerPhone').value,
+            sellerToken: localStorage.getItem('ryneczek_push_token') || "",
+            address: document.getElementById('pickupAddress').value,
+            pickupTimes: document.getElementById('pickupTimes').value,
+            expiryDate: document.getElementById('expiryDate').value,
+            pin: document.getElementById('pin').value,
+            items: products,
+            createdAt: new Date(),
+            reservations: []
         });
+
+        location.reload();
+    } catch (err) {
+        alert("Błąd: " + err.message);
+        btn.disabled = false;
     }
-
-    await addDoc(collection(db, "listings"), {
-        sellerName: document.getElementById('sellerName').value,
-        sellerPhone: document.getElementById('sellerPhone').value,
-        address: document.getElementById('pickupAddress').value,
-        pickupTimes: document.getElementById('pickupTimes').value,
-        expiryDate: document.getElementById('expiryDate').value,
-        pin: document.getElementById('pin').value,
-        items: products,
-        createdAt: new Date(),
-        reservations: []
-    });
-
-    location.reload();
 };
 
-// --- MODAL ZAMÓWIENIA ---
 window.openOrderModal = async (id) => {
     currentEditId = id;
     const snap = await getDoc(doc(db, "listings", id));
     const d = snap.data();
     cachedListingData = d;
-
     const container = document.getElementById('modal-order-items');
     container.innerHTML = '';
-
     d.items.forEach(it => {
         container.innerHTML += `
             <div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center;">
@@ -166,9 +198,6 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         const q = parseFloat(span.innerText);
         if (q > 0) items.push({ name: span.dataset.name, qty: q });
     });
-
-    if (items.length === 0) return alert("Wybierz produkty!");
-
     const refL = doc(db, "listings", currentEditId);
     let res = cachedListingData.reservations || [];
     res.push({
@@ -177,17 +206,11 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         items,
         time: document.getElementById('buyerPickupTime').value
     });
-
     await updateDoc(refL, { reservations: res });
     location.reload();
 };
 
-// --- AUTORYZACJA SPRZEDAWCY (⚙️) ---
 window.authSeller = async (id, pin) => {
-    const input = prompt("Podaj PIN ogłoszenia:");
-    if (input === pin) {
-        alert("Autoryzacja pomyślna. Tu w przyszłości będzie zarządzanie rezerwacjami.");
-    } else {
-        alert("Błędny PIN.");
-    }
+    const input = prompt("Podaj PIN:");
+    if (input === pin) alert("PIN OK!"); else alert("Zły PIN!");
 };
