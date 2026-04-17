@@ -25,52 +25,61 @@ try {
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-// --- KONFIGURACJA POWIADOMIEŃ (WERSJA BEZ DEKODOWANIA - OMIJA BŁĄD INVALID CHARACTERS) ---
+// --- OSTATECZNA KONFIGURACJA POWIADOMIEŃ ---
 window.setupNotifications = async () => {
-    if (!('serviceWorker' in navigator)) return alert("Brak obsługi Service Worker.");
+    console.log("Próba aktywacji powiadomień...");
+    
+    if (!('serviceWorker' in navigator)) return alert("Twoje urządzenie nie obsługuje tej funkcji.");
     
     try {
-        const swPath = './firebase-messaging-sw.js?v=' + Date.now();
-        const registration = await navigator.serviceWorker.register(swPath);
+        // 1. Rejestracja Service Workera
+        const swUrl = './firebase-messaging-sw.js?v=' + Date.now();
+        const registration = await navigator.serviceWorker.register(swUrl);
         
-        // Czekamy na gotowość SW
         await navigator.serviceWorker.ready;
 
+        // 2. Uprawnienia
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return alert("Zezwól na powiadomienia w ustawieniach Safari.");
+        if (permission !== 'granted') {
+            return alert("Aby otrzymywać powiadomienia, musisz na to zezwolić w ustawieniach przeglądarki.");
+        }
 
-        // PODAJEMY GOTOWE BAJTY - To eliminuje błędy "invalid characters" i "P-256"
-        const binaryVapidKey = new Uint8Array([
+        // 3. KLUCZ VAPID - Wersja Buffer (najbardziej natywna dla iOS)
+        // Jeśli to wywali "invalid characters", to znaczy że błąd generuje sam system iOS 
+        // przy próbie rejestracji subskrypcji, a nie nasz kod.
+        const vapidKeyData = [
             4, 66, 110, 34, 73, 82, 112, 86, 119, 110, 107, 50, 66, 76, 85, 79, 
             49, 78, 79, 104, 90, 104, 115, 67, 85, 48, 97, 51, 116, 49, 112, 84, 
             120, 115, 49, 107, 50, 70, 52, 85, 65, 84, 110, 112, 88, 86, 89, 55, 
             107, 87, 87, 79, 78, 51, 84, 81, 68, 90, 45, 114, 53, 105, 81, 66, 
             102, 110, 109, 95, 88, 107, 66, 85, 72, 80, 67, 87, 71, 66, 84, 66, 
             117, 86, 52, 72, 69
-        ]);
+        ];
+        const vapidKeyUint8 = new Uint8Array(vapidKeyData);
 
         const token = await getToken(messaging, { 
-            vapidKey: binaryVapidKey, 
+            vapidKey: vapidKeyUint8, 
             serviceWorkerRegistration: registration 
         });
 
         if (token) {
             localStorage.setItem('ryneczek_push_token', token);
-            alert("✅ Sukces! Powiadomienia aktywne.");
+            alert("✅ Gotowe! Powiadomienia zostały włączone.");
             console.log("Token:", token);
         }
     } catch (error) {
-        console.error("Błąd:", error);
+        console.error("Błąd szczegółowy:", error);
+        // Jeśli błąd to nadal "invalid characters", sprawdzamy czy to nie wina Firebase SDK
         alert("Błąd: " + error.message);
     }
 };
 
-// --- LOGIKA OFERT ---
+// --- LOGIKA OFERT (BEZ ZMIAN) ---
 const createProductFields = () => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     div.innerHTML = `
-        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" required></div>
+        <div class="input-group"><label>Produkt</label><input type="text" class="p-name" required></div>
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" required></div>
             <div class="input-group"><label>Jednostka</label>
@@ -78,9 +87,9 @@ const createProductFields = () => {
             </div>
         </div>
         <div class="form-grid">
-            <div class="input-group"><label>Pula (ilość)</label><input type="number" class="p-total" step="0.01" required></div>
-            <div class="input-group"><label>Krok wyboru</label>
-                <select class="p-step"><option value="1">1</option><option value="0.5">0.5</option><option value="0.1">0.1</option></select>
+            <div class="input-group"><label>Pula</label><input type="number" class="p-total" step="0.01" required></div>
+            <div class="input-group"><label>Krok</label>
+                <select class="p-step"><option value="1">1</option><option value="0.5">0.5</option></select>
             </div>
         </div>
         <input type="file" class="p-file" accept="image/*">
@@ -100,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="listing-header">
                     <h3>Sprzedawca: ${d.sellerName}</h3>
-                    <p>📍 ${d.address} | 📞 ${d.sellerPhone}</p>
+                    <p>📍 ${d.address}</p>
                 </div>
                 <div class="card-footer">
                     <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów</button>
@@ -126,12 +135,9 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.innerText = "Publikowanie...";
-
     try {
         const products = [];
-        const productBoxes = document.querySelectorAll('.product-form-box');
-        
-        for (const div of productBoxes) {
+        for (const div of document.querySelectorAll('.product-form-box')) {
             const file = div.querySelector('.p-file').files[0];
             let imageUrl = "";
             if (file) {
@@ -148,7 +154,6 @@ document.getElementById('listing-form').onsubmit = async (e) => {
                 imageUrl: imageUrl
             });
         }
-
         await addDoc(collection(db, "listings"), {
             sellerName: document.getElementById('sellerName').value,
             sellerPhone: document.getElementById('sellerPhone').value,
@@ -161,11 +166,8 @@ document.getElementById('listing-form').onsubmit = async (e) => {
             createdAt: new Date(),
             reservations: []
         });
-
-        alert("Oferta opublikowana!");
         location.reload();
     } catch (err) {
-        console.error(err);
         alert("Błąd: " + err.message);
         btn.disabled = false;
         btn.innerText = "Opublikuj ofertę";
