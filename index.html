@@ -47,7 +47,98 @@
                     </div>
                     <div class="input-group">
                         <label>Kiedy można odbierać?</label>
-                        <input type="text" id="pickupTimes" placeholder="np. Codziennie 17:00-20:00" required>
+                        <input ty<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Sąsiedzki Ryneczek</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="main-header">
+            <h1>Sąsiedzki Ryneczek</h1>
+            <p class="subtitle">Domowe produkty od Twoich sąsiadów</p>
+            <div class="top-action">
+                <button id="btn-open-add" class="btn-add-main">➕ Opublikuj nową ofertę</button>
+            </div>
+        </header>
+        <main id="listings-container">
+            <p class="status-msg">Ładowanie ofert...</p>
+        </main>
+    </div>
+
+    <div id="add-listing-modal" class="modal hidden">
+        <div class="modal-content modal-solid scrollable-modal">
+            <h2 id="modal-title">Nowa oferta</h2>
+            <form id="listing-form">
+                <div class="form-grid">
+                    <div class="input-group"><label>Twoje Imię</label><input type="text" id="sellerName" required></div>
+                    <div class="input-group"><label>Twój numer telefonu</label><input type="tel" id="sellerPhone" placeholder="Np. 500 000 000" required></div>
+                </div>
+                <div class="input-group"><label>Adres odbioru</label><input type="text" id="pickupAddress" required></div>
+                <div class="form-grid">
+                    <div class="input-group"><label>Godziny odbioru</label><input type="text" id="pickupTimes" placeholder="Np. Pon-Pt 17-20" required></div>
+                    <div class="input-group"><label>Oferta ważna do:</label><input type="datetime-local" id="expiryDate" required></div>
+                </div>
+                <hr class="divider">
+                <div id="products-to-add"></div>
+                <button type="button" id="add-more-items" class="btn-secondary-action">+ Dodaj produkt</button>
+                <div class="input-group" style="margin-top:20px"><label>PIN ogłoszenia (4 cyfry)</label><input type="text" id="pin" maxlength="4" required></div>
+                <div class="modal-actions">
+                    <button type="submit" id="submitBtn" class="btn-primary-action">Opublikuj ofertę</button>
+                    <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Anuluj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="reservation-modal" class="modal hidden">
+        <div class="modal-content modal-solid scrollable-modal">
+            <h3>Twoje zamówienie</h3>
+            <div id="modal-order-items"></div>
+            <div class="total-bar"><span>Razem:</span><span><span id="modal-total-price">0.00</span> zł</span></div>
+            <div class="form-grid">
+                <div class="input-group"><label>Twoje imię</label><input type="text" id="buyerName" required></div>
+                <div class="input-group"><label>Twój numer telefonu</label><input type="tel" id="buyerPhone" placeholder="Tylko dla sprzedawcy" required></div>
+            </div>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Kiedy odbierzesz? <span id="modal-pickup-info" style="color: var(--accent); font-size: 0.8rem; display: block; margin-top: 3px; font-weight: bold;"></span></label>
+                    <input type="text" id="buyerPickupTime" required>
+                </div>
+                <div class="input-group"><label>PIN (4 cyfry do edycji)</label><input type="text" id="buyerPin" maxlength="4" required></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
+                <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="seller-modal" class="modal hidden">
+        <div class="modal-content modal-solid scrollable-modal">
+            <h3>Zarządzanie</h3>
+            <div class="tabs">
+                <button id="view-by-person" class="tab active">👤 Osoby</button>
+                <button id="view-by-product" class="tab">📦 Produkty</button>
+            </div>
+            <div id="reservations-container"></div>
+            <div class="modal-actions">
+                <button type="button" id="btn-edit-offer" class="btn-warning-action">✏️ Edytuj treść ogłoszenia</button>
+                <button type="button" id="btn-delete-offer" class="btn-danger-action">🗑️ Usuń całą ofertę</button>
+                <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Zamknij</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>pe="text" id="pickupTimes" placeholder="np. Codziennie 17:00-20:00" required>
                     </div>
                     <div class="input-group">
                         <label>Data ważności oferty</label>

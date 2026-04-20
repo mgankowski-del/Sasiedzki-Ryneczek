@@ -1,120 +1,52 @@
-/* --- OGÓLNE STYLE --- */
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #f0f2f5;
-    margin: 0;
-    padding: 0;
-    color: #1c1e21;
+:root {
+    --primary: #6366f1;
+    --modal-bg: #1e293b;
+    --accent: #10b981;
+    --input-border: #334155;
+    color-scheme: dark; /* Wymusza ciemny kalendarz na komputerze */
 }
+body { font-family: -apple-system, system-ui, sans-serif; background: #0f172a; color: white; margin: 0; padding: 0; }
+.app-container { max-width: 800px; margin: 0 auto; padding: 20px; }
+.main-header { text-align: center; padding: 30px 0; }
+.btn-add-main { background: var(--primary); color: white; border: none; padding: 18px 32px; border-radius: 16px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3); }
 
-/* --- KARTY OFERT --- */
-.product-card {
-    background: white;
-    border-radius: 16px;
-    padding: 20px;
-    margin: 15px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    border: 1px solid #e1e4e8;
-}
+.product-card { background: white; color: #1e293b; border-radius: 24px; overflow: hidden; margin-bottom: 30px; }
+.listing-header { padding: 20px; background: #f8fafc; border-bottom: 1px solid #eee; }
+.product-item-list { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #f1f5f9; gap: 15px; }
+.thumb { width: 55px; height: 55px; border-radius: 10px; object-fit: cover; }
+.card-footer { padding: 15px 20px; display: grid; grid-template-columns: 1fr auto; gap: 10px; background: #f8fafc; }
 
-.listing-header h3 {
-    margin: 0 0 6px 0;
-    font-size: 1.2rem;
-    color: #1a73e8;
-}
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 15px; box-sizing: border-box; }
+.modal-solid { background: var(--modal-bg); border-radius: 28px; padding: 25px; width: 100%; max-width: 550px; border: 1px solid rgba(255,255,255,0.1); }
+.scrollable-modal { max-height: 92vh; overflow-y: auto; }
+.hidden { display: none !important; }
 
-.listing-header p {
-    margin: 0;
-    color: #5f6368;
-    font-size: 0.95rem;
-}
+/* FIX DLA INPUTÓW I SELECTÓW */
+input, select { padding: 14px; border-radius: 10px; border: 2px solid var(--input-border); background: #0f172a; color: white; font-size: 1rem; width: 100%; box-sizing: border-box; }
+select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 14px center; background-size: 16px; }
 
-.card-footer {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 18px;
-    gap: 12px;
-}
+/* FIX DLA KALENDARZA NA PC */
+input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
 
-/* --- MODALE DLA IPHONE --- */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(5px);
-    z-index: 9999;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 20px 0;
-}
+.product-form-box { background: rgba(255,255,255,0.03); border: 1px solid var(--input-border); border-radius: 16px; padding: 15px; margin-bottom: 15px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 500px) { .form-grid { grid-template-columns: 1fr; } }
+.input-group { display: flex; flex-direction: column; margin-bottom: 10px; }
+.input-group label { font-size: 0.85rem; color: #94a3b8; margin-bottom: 5px; }
 
-.modal:not(.hidden) {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-}
+.btn-primary-action { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 14px; font-weight: 800; cursor: pointer; width: 100%; }
+.btn-cancel-action { background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid #475569; padding: 14px; border-radius: 14px; cursor: pointer; width: 100%; }
+.btn-secondary-action { background: transparent; border: 2px dashed #475569; color: #94a3b8; padding: 12px; border-radius: 12px; cursor: pointer; width: 100%; margin: 10px 0; }
+.btn-warning-action { background: #f59e0b; color: white; border: none; padding: 14px; border-radius: 14px; font-weight: 800; cursor: pointer; width: 100%; margin-bottom: 8px; }
+.btn-danger-action { background: #ef4444; color: white; border: none; padding: 14px; border-radius: 14px; font-weight: 800; cursor: pointer; width: 100%; margin-bottom: 8px; }
+.btn-manage-gear { background: #e2e8f0; color: #64748b; border: none; width: 50px; border-radius: 12px; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
 
-.modal-content {
-    background: white;
-    width: 90%;
-    max-width: 480px;
-    border-radius: 24px;
-    padding: 25px;
-    position: relative;
-    margin: auto;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-}
+.total-bar { background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; font-weight: 800; border: 1px solid var(--accent); color: var(--accent); margin: 15px 0; }
+.tabs { display: flex; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 12px; margin: 15px 0; }
+.tab { flex: 1; padding: 10px; border: none; border-radius: 10px; background: transparent; color: #94a3b8; cursor: pointer; font-weight: bold; }
+.tab.active { background: var(--primary); color: white; }
 
-.hidden {
-    display: none !important;
-}
-
-/* --- FORMULARZE --- */
-.input-group {
-    margin-bottom: 16px;
-}
-
-.input-group label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: #3c4043;
-}
-
-.input-group input, .input-group select {
-    width: 100%;
-    padding: 14px;
-    border: 1.5px solid #dadce0;
-    border-radius: 10px;
-    font-size: 16px; /* Blokuje auto-zoom na iOS */
-    box-sizing: border-box;
-}
-
-.input-group input:focus {
-    border-color: #1a73e8;
-    outline: none;
-}
-
-.btn-primary-action, .btn-save {
-    background: #1a73e8;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-}
-
-.btn-manage-gear {
-    background: #f1f3f4;
-    border: none;
-    padding: 10px;
-    border-radius: 10px;
-    cursor: pointer;
-}
+.res-card-ui { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 15px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1); }
+.res-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+.res-item-line { display: flex; justify-content: space-between; font-size: 0.95rem; padding: 4px 0; }
+.res-total-highlight { text-align: right; margin-top: 10px; font-weight: bold; color: var(--accent); font-size: 1.1rem; }
