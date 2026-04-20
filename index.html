@@ -39,7 +39,10 @@
                         <div class="input-group"><label>Godziny odbioru</label><input type="text" id="pickupTimes" placeholder="np. Pon-Pt 17-20" required></div>
                         <div class="input-group"><label>Ważność oferty</label><input type="datetime-local" id="expiryDate" required></div>
                     </div>
-                    <div class="input-group"><label>PIN ogłoszenia (4 cyfry do edycji)</label><input type="password" id="pin" maxlength="4" pattern="\\d{4}" required></div>
+                    <div class="input-group">
+                        <label>PIN ogłoszenia (4 cyfry do edycji)</label>
+                        <input type="text" inputmode="numeric" id="pin" maxlength="4" pattern="\d{4}" required>
+                    </div>
                 </div>
 
                 <div class="form-section">
@@ -77,7 +80,10 @@
                         <label>Kiedy odbierzesz? <span id="modal-pickup-info"></span></label>
                         <input type="text" id="buyerPickupTime" placeholder="np. Dziś o 18:00" required>
                     </div>
-                    <div class="input-group"><label>Twój PIN (do ew. zmian)</label><input type="password" id="buyerPin" maxlength="4" pattern="\\d{4}" required></div>
+                    <div class="input-group">
+                        <label>Twój PIN (do ew. zmian)</label>
+                        <input type="text" inputmode="numeric" id="buyerPin" maxlength="4" pattern="\d{4}" required>
+                    </div>
                 </div>
             </div>
 
