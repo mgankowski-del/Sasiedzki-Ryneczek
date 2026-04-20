@@ -3,182 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Sąsiedzki Ryneczek</title>
     <link rel="stylesheet" href="style.css">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-</head>
-<body>
-
-    <header>
-        <h1>🍏 Sąsiedzki Ryneczek</h1>
-        <p>Świeże produkty od Twoich sąsiadów</p>
-    </header>
-
-    <main>
-        <div class="actions-bar">
-            <button id="btn-open-add" class="btn-primary">➕ Dodaj swoją ofertę</button>
-        </div>
-
-        <section id="listings-container">
-            <div class="loader">Ładowanie ofert...</div>
-        </section>
-    </main>
-
-    <div id="add-listing-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-btn" onclick="window.closeModals()">&times;</span>
-            <h2>Nowa oferta</h2>
-            <form id="listing-form">
-                <div class="form-section">
-                    <h3>Dane sprzedawcy</h3>
-                    <div class="input-group">
-                        <label>Twoje Imię / Nazwa</label>
-                        <input type="text" id="sellerName" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Telefon kontaktowy</label>
-                        <input type="tel" id="sellerPhone" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Adres odbioru</label>
-                        <input type="text" id="pickupAddress" placeholder="np. ul. Polna 4, klatka 2" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Kiedy można odbierać?</label>
-                        <input ty<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Sąsiedzki Ryneczek</title>
-    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
         <header class="main-header">
-            <h1>Sąsiedzki Ryneczek</h1>
-            <p class="subtitle">Domowe produkty od Twoich sąsiadów</p>
-            <div class="top-action">
-                <button id="btn-open-add" class="btn-add-main">➕ Opublikuj nową ofertę</button>
-            </div>
+            <h1>🍏 Sąsiedzki Ryneczek</h1>
+            <p class="subtitle">Świeże produkty od Twoich sąsiadów</p>
+            <button id="btn-open-add" class="btn-add-main">➕ Dodaj swoją ofertę</button>
         </header>
+        
         <main id="listings-container">
-            <p class="status-msg">Ładowanie ofert...</p>
+            <div class="status-msg">Ładowanie ofert...</div>
         </main>
     </div>
 
     <div id="add-listing-modal" class="modal hidden">
-        <div class="modal-content modal-solid scrollable-modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="window.closeModals()">&times;</span>
             <h2 id="modal-title">Nowa oferta</h2>
             <form id="listing-form">
-                <div class="form-grid">
-                    <div class="input-group"><label>Twoje Imię</label><input type="text" id="sellerName" required></div>
-                    <div class="input-group"><label>Twój numer telefonu</label><input type="tel" id="sellerPhone" placeholder="Np. 500 000 000" required></div>
+                <div class="form-section">
+                    <h3>Twoje dane (Sprzedawca)</h3>
+                    <div class="form-grid">
+                        <div class="input-group"><label>Imię / Nazwa</label><input type="text" id="sellerName" required></div>
+                        <div class="input-group"><label>Telefon</label><input type="tel" id="sellerPhone" placeholder="np. 500 600 700" required></div>
+                    </div>
+                    <div class="input-group"><label>Adres odbioru</label><input type="text" id="pickupAddress" placeholder="np. ul. Polna 4, klatka 2" required></div>
+                    <div class="form-grid">
+                        <div class="input-group"><label>Godziny odbioru</label><input type="text" id="pickupTimes" placeholder="np. Pon-Pt 17-20" required></div>
+                        <div class="input-group"><label>Ważność oferty</label><input type="datetime-local" id="expiryDate" required></div>
+                    </div>
+                    <div class="input-group"><label>PIN ogłoszenia (4 cyfry do edycji)</label><input type="password" id="pin" maxlength="4" pattern="\\d{4}" required></div>
                 </div>
-                <div class="input-group"><label>Adres odbioru</label><input type="text" id="pickupAddress" required></div>
-                <div class="form-grid">
-                    <div class="input-group"><label>Godziny odbioru</label><input type="text" id="pickupTimes" placeholder="Np. Pon-Pt 17-20" required></div>
-                    <div class="input-group"><label>Oferta ważna do:</label><input type="datetime-local" id="expiryDate" required></div>
+
+                <div class="form-section">
+                    <h3>Produkty</h3>
+                    <div id="products-to-add"></div>
+                    <button type="button" id="add-more-items" class="btn-secondary-action">➕ Dodaj kolejny produkt</button>
                 </div>
-                <hr class="divider">
-                <div id="products-to-add"></div>
-                <button type="button" id="add-more-items" class="btn-secondary-action">+ Dodaj produkt</button>
-                <div class="input-group" style="margin-top:20px"><label>PIN ogłoszenia (4 cyfry)</label><input type="text" id="pin" maxlength="4" required></div>
+
                 <div class="modal-actions">
                     <button type="submit" id="submitBtn" class="btn-primary-action">Opublikuj ofertę</button>
-                    <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Anuluj</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div id="reservation-modal" class="modal hidden">
-        <div class="modal-content modal-solid scrollable-modal">
-            <h3>Twoje zamówienie</h3>
+        <div class="modal-content">
+            <span class="close-btn" onclick="window.closeModals()">&times;</span>
+            <h2>Twoje zamówienie</h2>
             <div id="modal-order-items"></div>
-            <div class="total-bar"><span>Razem:</span><span><span id="modal-total-price">0.00</span> zł</span></div>
-            <div class="form-grid">
-                <div class="input-group"><label>Twoje imię</label><input type="text" id="buyerName" required></div>
-                <div class="input-group"><label>Twój numer telefonu</label><input type="tel" id="buyerPhone" placeholder="Tylko dla sprzedawcy" required></div>
+            
+            <div class="total-bar">
+                <span>Razem do zapłaty:</span>
+                <span><span id="modal-total-price">0.00</span> zł</span>
             </div>
-            <div class="form-grid">
-                <div class="input-group">
-                    <label>Kiedy odbierzesz? <span id="modal-pickup-info" style="color: var(--accent); font-size: 0.8rem; display: block; margin-top: 3px; font-weight: bold;"></span></label>
-                    <input type="text" id="buyerPickupTime" required>
+
+            <div class="form-section">
+                <h3>Twoje dane kontaktowe</h3>
+                <div class="form-grid">
+                    <div class="input-group"><label>Twoje imię</label><input type="text" id="buyerName" required></div>
+                    <div class="input-group"><label>Twój telefon (dla sprzedawcy)</label><input type="tel" id="buyerPhone" placeholder="np. 500 600 700" required></div>
                 </div>
-                <div class="input-group"><label>PIN (4 cyfry do edycji)</label><input type="text" id="buyerPin" maxlength="4" required></div>
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label>Kiedy odbierzesz? <span id="modal-pickup-info"></span></label>
+                        <input type="text" id="buyerPickupTime" placeholder="np. Dziś o 18:00" required>
+                    </div>
+                    <div class="input-group"><label>Twój PIN (do ew. zmian)</label><input type="password" id="buyerPin" maxlength="4" pattern="\\d{4}" required></div>
+                </div>
             </div>
+
             <div class="modal-actions">
                 <button type="button" id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
-                <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Anuluj</button>
             </div>
         </div>
     </div>
 
     <div id="seller-modal" class="modal hidden">
-        <div class="modal-content modal-solid scrollable-modal">
-            <h3>Zarządzanie</h3>
+        <div class="modal-content">
+            <span class="close-btn" onclick="window.closeModals()">&times;</span>
+            <h2>Zarządzanie ofertą</h2>
             <div class="tabs">
-                <button id="view-by-person" class="tab active">👤 Osoby</button>
-                <button id="view-by-product" class="tab">📦 Produkty</button>
+                <button id="view-by-person" class="tab active">👤 Zamówienia</button>
+                <button id="view-by-product" class="tab">📦 Stan produktów</button>
             </div>
             <div id="reservations-container"></div>
-            <div class="modal-actions">
-                <button type="button" id="btn-edit-offer" class="btn-warning-action">✏️ Edytuj treść ogłoszenia</button>
-                <button type="button" id="btn-delete-offer" class="btn-danger-action">🗑️ Usuń całą ofertę</button>
-                <button type="button" class="btn-cancel-action" onclick="window.closeModals()">Zamknij</button>
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button type="button" id="btn-edit-offer" class="btn-warning-action">✏️ Edytuj ofertę</button>
+                <button type="button" id="btn-delete-offer" class="btn-danger-action">🗑️ Usuń ofertę</button>
             </div>
         </div>
     </div>
 
     <script type="module" src="app.js"></script>
-</body>
-</html>pe="text" id="pickupTimes" placeholder="np. Codziennie 17:00-20:00" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Data ważności oferty</label>
-                        <input type="date" id="expiryDate" required>
-                    </div>
-                    <div class="input-group">
-                        <label>PIN do edycji (4 cyfry)</label>
-                        <input type="password" id="pin" maxlength="4" pattern="\d{4}" required>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h3>Produkty</h3>
-                    <div id="products-to-add">
-                        </div>
-                </div>
-
-                <button type="submit" id="submitBtn" class="btn-save">Opublikuj ofertę</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="order-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-btn" onclick="window.closeModals()">&times;</span>
-            <div id="order-details">
-                </div>
-        </div>
-    </div>
-
-    <div id="manage-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-btn" onclick="window.closeModals()">&times;</span>
-            <div id="manage-content">
-                </div>
-        </div>
-    </div>
-
-    <script type="module" src="app.js"></script>
-    <script src="order.js"></script>
-    <script src="manage.js"></script>
 </body>
 </html>

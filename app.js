@@ -1,47 +1,25 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
-import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyD_cuGXokb55W6W4aB-QkV0c_jAqXkJQgk",
     authDomain: "sasiedzki-ryneczek.firebaseapp.com",
     projectId: "sasiedzki-ryneczek",
     storageBucket: "sasiedzki-ryneczek.firebasestorage.app",
-    messagingSenderId: "885991041208",
     appId: "1:885991041208:web:3df60bebb747b563f86c4d"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
-let messaging = null;
-
-// Zabezpieczenie przed brakiem wsparcia powiadomień w przeglądarce
-if ('Notification' in window && 'serviceWorker' in navigator) {
-    try { messaging = getMessaging(app); } catch (e) { console.log("Messaging wyłączone"); }
-}
 
 let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- POWIADOMIENIA (BEZPIECZNE) ---
-async function requestPermission() {
-    if (!messaging || !('Notification' in window)) return; // Jeśli przeglądarka nie wspiera, pomiń
-    try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            const token = await getToken(messaging, { vapidKey: 'nP5epfMI7IJkkq-8zvos2dLjYoVXJjYF9YwLsQ7knLk' });
-            if (token) localStorage.setItem('ryneczek_push_token', token);
-        }
-    } catch (error) {
-        console.error("Błąd powiadomień (zignorowany):", error);
-    }
-}
-
-// --- AUTOSPRZĄTANIE (BEZPIECZNE) ---
+// --- AUTOSPRZĄTANIE ---
 const cleanupExpired = async () => {
     try {
         const now = new Date();
@@ -53,12 +31,10 @@ const cleanupExpired = async () => {
                 if (now > new Date(exp.getTime() + 24 * 60 * 60 * 1000)) await deleteDoc(doc(db, "listings", docSnap.id));
             }
         });
-    } catch (error) {
-        console.error("Błąd czyszczenia bazy:", error);
-    }
+    } catch (error) { console.error("Błąd czyszczenia bazy:", error); }
 };
 
-// --- LOGIKA UŁAMKÓW I STANÓW (Zabezpieczona przed starymi danymi) ---
+// --- LOGIKA UŁAMKÓW I STANÓW ---
 const getRem = (name, total, res = [], ignoreIdx = null) => {
     let reserved = 0;
     if (Array.isArray(res)) {
@@ -80,24 +56,25 @@ const createProductFields = (data = {}) => {
     div.className = 'product-form-box';
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
-        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
+        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="np. Jajka" required></div>
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
             <div class="input-group"><label>Jednostka</label>
-                <select class="p-unit"><option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option><option value="kg" ${data.unit==='kg'?'selected':''}>kg</option><option value="g" ${data.unit==='g'?'selected':''}>g</option></select>
+                <select class="p-unit"><option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option><option value="kg" ${data.unit==='kg'?'selected':''}>kg</option><option value="g" ${data.unit==='g'?'selected':''}>g</option><option value="litr" ${data.unit==='litr'?'selected':''}>litr</option></select>
             </div>
         </div>
         <div class="form-grid">
             <div class="input-group"><label>Łączna ilość (pula)</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
-            <div class="input-group"><label>Czy można dzielić?</label>
+            <div class="input-group"><label>Sposób dzielenia</label>
                 <select class="p-step">
-                    <option value="1" ${initialStep==1?'selected':''}>Tylko w całości (1, 2, 3...)</option>
-                    <option value="0.5" ${initialStep==0.5?'selected':''}>Na połówki (0.5, 1, 1.5...)</option>
-                    <option value="0.25" ${initialStep==0.25?'selected':''}>Na ćwiartki (0.25, 0.5...)</option>
+                    <option value="1" ${initialStep==1?'selected':''}>Tylko w całości (1, 2...)</option>
+                    <option value="0.5" ${initialStep==0.5?'selected':''}>Na połówki (0.5, 1...)</option>
+                    <option value="0.25" ${initialStep==0.25?'selected':''}>Na ćwiartki (0.25...)</option>
+                    <option value="0.1" ${initialStep==0.1?'selected':''}>Co 100g (0.1, 0.2...)</option>
                 </select>
             </div>
         </div>
-        <input type="file" class="p-file" accept="image/*" style="margin-top:10px; border:none; background:transparent">
+        <div class="input-group"><label>Zdjęcie produktu</label><input type="file" class="p-file" accept="image/*" style="border:none; padding:0;"></div>
     `;
     return div;
 };
@@ -105,7 +82,6 @@ const createProductFields = (data = {}) => {
 document.addEventListener('DOMContentLoaded', () => {
     cleanupExpired();
     document.getElementById('btn-open-add').onclick = () => {
-        requestPermission();
         isEditingOffer = false;
         document.getElementById('modal-title').innerText = "Nowa oferta";
         document.getElementById('listing-form').reset();
@@ -119,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- ZAPIS OFERTY ---
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
-    const btn = document.getElementById('submitBtn'); btn.disabled = true;
+    const btn = document.getElementById('submitBtn'); btn.disabled = true; btn.innerText = "Zapisywanie...";
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
@@ -143,18 +119,22 @@ document.getElementById('listing-form').onsubmit = async (e) => {
         pin: document.getElementById('pin').value, items: products, 
         updatedAt: new Date(), reservations: cachedListingData?.reservations || []
     };
-    if(isEditingOffer) await updateDoc(doc(db, "listings", currentEditId), data);
-    else { data.createdAt = new Date(); await addDoc(collection(db, "listings"), data); }
-    location.reload();
+    try {
+        if(isEditingOffer) await updateDoc(doc(db, "listings", currentEditId), data);
+        else { data.createdAt = new Date(); await addDoc(collection(db, "listings"), data); }
+        window.closeModals();
+        location.reload();
+    } catch(err) {
+        alert(err.message); btn.disabled = false; btn.innerText = "Opublikuj ofertę";
+    }
 };
 
-// --- ŁADOWANIE OGŁOSZEŃ Z ZABEZPIECZENIEM ---
+// --- ŁADOWANIE OGŁOSZEŃ ---
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
     cont.innerHTML = '';
     const now = new Date();
-    
     let hasValidOffers = false;
 
     snap.forEach(docSnap => {
@@ -165,13 +145,13 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         const card = document.createElement('div'); card.className = 'product-card';
         card.innerHTML = `
             <div class="listing-header">
-                <h3>Odbiór u: ${d.sellerName}</h3>
+                <h3>${d.sellerName}</h3>
                 <p>📍 ${d.address} | 📞 ${d.sellerPhone || 'Brak telefonu'}</p>
-                <p style="margin-top: 8px; color: var(--accent); font-weight: bold; font-size: 0.95rem;">⏰ Odbiór: ${d.pickupTimes}</p>
+                <p class="pickup-info">⏰ Odbiór: ${d.pickupTimes}</p>
             </div>
             ${(d.items || []).map(it => {
                 const rem = getRem(it.name, it.totalQty, d.reservations || []);
-                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/60?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? '#10b981' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
+                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/60?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? 'var(--primary)' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
             }).join('')}
             <div class="card-footer">
                 <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów / Zmień</button>
@@ -182,19 +162,17 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     });
 
     if (!hasValidOffers) {
-        cont.innerHTML = '<p class="status-msg">Brak ofert na Ryneczku. Dodaj pierwszą!</p>';
+        cont.innerHTML = '<div class="status-msg">Brak ofert na Ryneczku. Dodaj pierwszą!</div>';
     }
 });
 
 // --- OKNO ZAMÓWIENIA ---
 window.openOrderModal = async (id, editIdx = null) => {
-    requestPermission();
-    
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
     const container = document.getElementById('modal-order-items'); container.innerHTML = '';
     
-    document.getElementById('modal-pickup-info').innerText = `(⏰ Możliwe godziny: ${d.pickupTimes})`;
+    document.getElementById('modal-pickup-info').innerText = `(Zalecane: ${d.pickupTimes})`;
     
     (d.items || []).forEach((it) => {
         const reservations = d.reservations || [];
@@ -203,12 +181,12 @@ window.openOrderModal = async (id, editIdx = null) => {
             ? (reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
             
         container.innerHTML += `
-            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                <div style="flex:1"><b style="display:block">${it.name}</b><small style="color:var(--accent)">Dostępne: ${Number(rem.toFixed(2))}</small></div>
+            <div style="background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="flex:1"><b style="display:block">${it.name}</b><small style="color:var(--primary); font-weight:bold;">Dostępne: ${Number(rem.toFixed(2))}</small></div>
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.nextElementSibling; s.innerText = Number(Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2)); window.updateSum();">-</button>
+                    <button type="button" class="qty-btn" onclick="const s = this.nextElementSibling; s.innerText = Number(Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2)); window.updateSum();">-</button>
                     <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="font-weight:bold; min-width:40px; text-align:center">${Number(startVal).toString()}</span>
-                    <button type="button" class="qty-btn" style="width:36px; height:36px; background:var(--primary); border:none; border-radius:8px; color:white; font-weight:bold" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=Number((parseFloat(s.innerText)+${it.step}).toFixed(2));window.updateSum();}else{alert('Brak wystarczającej ilości w puli!');}">+</button>
+                    <button type="button" class="qty-btn" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=Number((parseFloat(s.innerText)+${it.step}).toFixed(2));window.updateSum();}else{alert('Brak wystarczającej ilości w puli!');}">+</button>
                 </div>
             </div>`;
     });
@@ -217,6 +195,7 @@ window.openOrderModal = async (id, editIdx = null) => {
         document.getElementById('buyerName').value = localStorage.getItem('ryneczek_name') || '';
         document.getElementById('buyerPhone').value = localStorage.getItem('ryneczek_phone') || '';
         document.getElementById('buyerPin').value = localStorage.getItem('ryneczek_pin') || '';
+        document.getElementById('buyerPickupTime').value = '';
         if(document.getElementById('buyerName').value) lookUpOrder();
     } else {
         const resData = d.reservations[editIdx];
@@ -250,13 +229,13 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     const name = document.getElementById('buyerName').value.trim();
     const phone = document.getElementById('buyerPhone').value.trim();
     const pin = document.getElementById('buyerPin').value.trim();
-    const time = document.getElementById('buyerPickupTime').value;
+    const time = document.getElementById('buyerPickupTime').value.trim();
     const items = [];
     document.querySelectorAll('.order-qty-val').forEach(span => {
         const q = parseFloat(span.innerText); if(q > 0) items.push({ name: span.dataset.name, qty: q });
     });
 
-    if(!name || !phone || pin.length !== 4 || items.length === 0) return alert("Uzupełnij dane kontaktowe i wybierz produkty!");
+    if(!name || !phone || pin.length !== 4 || items.length === 0 || !time) return alert("Uzupełnij wszystkie dane kontaktowe i wybierz produkty!");
     
     localStorage.setItem('ryneczek_name', name); 
     localStorage.setItem('ryneczek_phone', phone);
@@ -272,7 +251,10 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         const existIdx = res.findIndex(r => r.buyerName.toLowerCase() === name.toLowerCase() && r.buyerPin === pin);
         if(existIdx !== -1) res[existIdx] = newData; else res.push(newData);
     }
-    await updateDoc(refL, { reservations: res }); location.reload();
+    await updateDoc(refL, { reservations: res }); 
+    window.closeModals();
+    alert("Super! Zamówienie zostało zarejestrowane.");
+    location.reload();
 };
 
 // --- PANEL SPRZEDAWCY ---
@@ -299,13 +281,12 @@ const renderSellerView = (type) => {
             container.innerHTML += `<div class="res-card-ui">
                 <div class="res-card-header">
                     <div>
-                        <b style="color:var(--accent); display:block;">👤 ${r.buyerName}</b>
-                        <small style="color:#94a3b8">📞 ${r.buyerPhone || 'Brak numeru'}</small>
+                        <b style="color:var(--text-color); display:block; font-size:1.1rem;">👤 ${r.buyerName}</b>
+                        <small style="color:#6b7280; font-weight:bold;">📞 ${r.buyerPhone || 'Brak numeru'}</small>
                     </div>
-                    <small>⏰ ${r.time || 'Brak'}</small>
+                    <small style="background:#e5e7eb; padding:4px 8px; border-radius:6px; font-weight:bold;">⏰ ${r.time || 'Brak'}</small>
                 </div>
                 ${itemsRows}<div class="res-total-highlight">Do zapłaty: ${pTotal.toFixed(2)} zł</div>
-                <button onclick="window.openOrderModal('${currentEditId}', ${idx})" class="btn-warning-action" style="padding:8px; font-size:0.8rem; margin-top:10px">✏️ Edytuj zamówienie sąsiada</button>
             </div>`;
         });
     } else {
@@ -317,9 +298,9 @@ const renderSellerView = (type) => {
                 return '';
             }).join('');
             container.innerHTML += `<div class="res-card-ui">
-                <div class="res-card-header"><b style="color:#a5b4fc">📦 ${product.name}</b><small>Sprzedano: ${tSold}/${product.totalQty}</small></div>
-                ${bRows || '<small style="opacity:0.5">Brak zamówień</small>'}
-                <div class="res-total-highlight">Suma: ${pGrand.toFixed(2)} zł</div>
+                <div class="res-card-header"><b style="color:#374151; font-size:1.1rem;">📦 ${product.name}</b><small style="background:#e5e7eb; padding:4px 8px; border-radius:6px; font-weight:bold;">Zarezerwowano: ${tSold}/${product.totalQty}</small></div>
+                ${bRows || '<small style="color:#9ca3af; display:block; padding:10px 0;">Brak zamówień</small>'}
+                <div class="res-total-highlight">Wartość: ${pGrand.toFixed(2)} zł</div>
             </div>`;
         });
     }
@@ -330,7 +311,7 @@ document.getElementById('view-by-product').onclick = () => renderSellerView('pro
 
 document.getElementById('btn-edit-offer').onclick = () => {
     isEditingOffer = true; const d = cachedListingData;
-    document.getElementById('modal-title').innerText = "Modyfikuj ofertę";
+    document.getElementById('modal-title').innerText = "Edycja oferty";
     document.getElementById('sellerName').value = d.sellerName;
     document.getElementById('sellerPhone').value = d.sellerPhone || '';
     document.getElementById('pickupAddress').value = d.address;
@@ -348,5 +329,5 @@ document.getElementById('btn-edit-offer').onclick = () => {
 };
 
 document.getElementById('btn-delete-offer').onclick = async () => {
-    if(confirm("Usunąć całe ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); }
+    if(confirm("Czy na pewno chcesz usunąć całe ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); }
 };
