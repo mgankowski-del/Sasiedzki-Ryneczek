@@ -17,6 +17,14 @@
             <p class="subtitle">Świeże produkty od Twoich sąsiadów</p>
             <button id="btn-open-add" class="btn-add-main">➕ Dodaj swoją ofertę</button>
         </header>
+
+        <div class="category-filters">
+            <button class="filter-btn active" data-cat="all">Wszystko</button>
+            <button class="filter-btn" data-cat="🍞 Spożywka">🍞 Spożywka</button>
+            <button class="filter-btn" data-cat="🪴 Ogrodowe">🪴 Ogrodowe</button>
+            <button class="filter-btn" data-cat="🛠️ Usługi">🛠️ Usługi</button>
+            <button class="filter-btn" data-cat="🛍️ Sprzedaż">🛍️ Sprzedaż</button>
+        </div>
         
         <main id="listings-container">
             <div class="status-msg">Ładowanie ofert...</div>
@@ -30,7 +38,6 @@
             <form id="listing-form">
                 <div class="form-section">
                     <h3>Główne informacje</h3>
-                    
                     <div class="input-group">
                         <label>Kategoria ogłoszenia</label>
                         <select id="category" required>
@@ -40,7 +47,6 @@
                             <option value="🛍️ Sprzedaż">🛍️ Sprzedaż (wszystko inne)</option>
                         </select>
                     </div>
-
                     <div class="form-grid">
                         <div class="input-group"><label>Imię / Nazwa</label><input type="text" id="sellerName" required></div>
                         <div class="input-group"><label>Telefon</label><input type="tel" id="sellerPhone" placeholder="np. 500 600 700" required></div>

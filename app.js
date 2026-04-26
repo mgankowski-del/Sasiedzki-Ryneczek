@@ -19,6 +19,10 @@ let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
+// Zmienne do filtrowania
+let allListingsData = [];
+let currentCategoryFilter = 'all';
+
 const cleanupExpired = async () => {
     try {
         const now = new Date();
@@ -76,8 +80,64 @@ const createProductFields = (data = {}) => {
     return div;
 };
 
+// --- LOGIKA RYSOWANIA OFERT (Z FILTREM) ---
+const renderListingsUI = () => {
+    const cont = document.getElementById('listings-container');
+    if (!cont) return;
+    cont.innerHTML = '';
+    
+    let hasValidOffers = false;
+
+    allListingsData.forEach(item => {
+        const d = item.data;
+        const docId = item.id;
+        const cat = d.category || '🛍️ Sprzedaż'; // Dla starych ogłoszeń
+
+        // Sprawdzamy czy ogłoszenie pasuje do filtra
+        if (currentCategoryFilter !== 'all' && cat !== currentCategoryFilter) return;
+
+        hasValidOffers = true;
+        const card = document.createElement('div'); 
+        card.className = 'product-card';
+        card.innerHTML = `
+            <div class="listing-header">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <h3>${d.sellerName}</h3>
+                    <span class="cat-badge">${cat}</span>
+                </div>
+                <p>📍 ${d.address} | 📞 ${d.sellerPhone || 'Brak telefonu'}</p>
+                <p class="pickup-info">⏰ Kiedy: ${d.pickupTimes}</p>
+            </div>
+            ${(d.items || []).map(it => {
+                const rem = getRem(it.name, it.totalQty, d.reservations || []);
+                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/85?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? 'var(--primary)' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
+            }).join('')}
+            <div class="card-footer">
+                <button class="btn-primary-action" onclick="window.openOrderModal('${docId}')">🛒 Zarezerwuj</button>
+                <button class="btn-manage-gear" onclick="window.authSeller('${docId}', '${d.pin}')">⚙️</button>
+            </div>
+        `;
+        cont.appendChild(card);
+    });
+
+    if (!hasValidOffers) {
+        cont.innerHTML = '<div class="status-msg">Brak ofert w tej kategorii.</div>';
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     cleanupExpired();
+    
+    // Obsługa przycisków filtrujących
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            currentCategoryFilter = e.target.dataset.cat;
+            renderListingsUI(); // Błyskawiczne odświeżenie listy z pamięci
+        });
+    });
+
     document.getElementById('btn-open-add').onclick = () => {
         isEditingOffer = false;
         document.getElementById('modal-title').innerText = "Nowa oferta";
@@ -107,7 +167,7 @@ document.getElementById('listing-form').onsubmit = async (e) => {
         });
     }
     const data = {
-        category: document.getElementById('category').value, // NOWE POLE
+        category: document.getElementById('category').value,
         sellerName: document.getElementById('sellerName').value, 
         sellerPhone: document.getElementById('sellerPhone').value,
         address: document.getElementById('pickupAddress').value,
@@ -126,44 +186,18 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     }
 };
 
+// Pobieranie ogłoszeń do pamięci lokalnej
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
-    const cont = document.getElementById('listings-container');
-    if (!cont) return;
-    cont.innerHTML = '';
     const now = new Date();
-    let hasValidOffers = false;
+    allListingsData = []; // Czyścimy listę
 
     snap.forEach(docSnap => {
         const d = docSnap.data();
         if (d.expiryDate && now > new Date(d.expiryDate)) return;
-        
-        hasValidOffers = true;
-        const card = document.createElement('div'); card.className = 'product-card';
-        // HTML KARTY Z BADGE'EM KATEGORII
-        card.innerHTML = `
-            <div class="listing-header">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <h3>${d.sellerName}</h3>
-                    <span class="cat-badge">${d.category || '🛍️ Inne'}</span>
-                </div>
-                <p>📍 ${d.address} | 📞 ${d.sellerPhone || 'Brak telefonu'}</p>
-                <p class="pickup-info">⏰ Odbiór: ${d.pickupTimes}</p>
-            </div>
-            ${(d.items || []).map(it => {
-                const rem = getRem(it.name, it.totalQty, d.reservations || []);
-                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/85?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? 'var(--primary)' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
-            }).join('')}
-            <div class="card-footer">
-                <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów / Zarezerwuj</button>
-                <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
-            </div>
-        `;
-        cont.appendChild(card);
+        allListingsData.push({ id: docSnap.id, data: d });
     });
 
-    if (!hasValidOffers) {
-        cont.innerHTML = '<div class="status-msg">Brak ofert na Ryneczku. Dodaj pierwszą!</div>';
-    }
+    renderListingsUI(); // Rysujemy listę z uwzględnieniem aktualnego filtra
 });
 
 window.openOrderModal = async (id, editIdx = null) => {
@@ -309,8 +343,6 @@ document.getElementById('view-by-product').onclick = () => renderSellerView('pro
 document.getElementById('btn-edit-offer').onclick = () => {
     isEditingOffer = true; const d = cachedListingData;
     document.getElementById('modal-title').innerText = "Edycja oferty";
-    
-    // Ustawienie wartości przy edycji
     document.getElementById('category').value = d.category || '🛍️ Sprzedaż'; 
     document.getElementById('sellerName').value = d.sellerName;
     document.getElementById('sellerPhone').value = d.sellerPhone || '';
