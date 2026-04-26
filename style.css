@@ -44,7 +44,13 @@ body {
 .category-filters::-webkit-scrollbar {
     display: none; 
 }
+/* Wymusza pustą przestrzeń na końcu scrolla dla Safari */
+.category-filters::after {
+    content: '';
+    padding-right: 1px; 
+}
 .filter-btn {
+    flex-shrink: 0; /* Zapobiega zgniataniu przycisków na małych ekranach */
     background: white;
     border: 1px solid var(--border-color);
     color: #4b5563;
