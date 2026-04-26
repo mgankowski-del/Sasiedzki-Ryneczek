@@ -19,7 +19,6 @@ let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// --- AUTOSPRZĄTANIE ---
 const cleanupExpired = async () => {
     try {
         const now = new Date();
@@ -34,7 +33,6 @@ const cleanupExpired = async () => {
     } catch (error) { console.error("Błąd czyszczenia bazy:", error); }
 };
 
-// --- LOGIKA UŁAMKÓW I STANÓW ---
 const getRem = (name, total, res = [], ignoreIdx = null) => {
     let reserved = 0;
     if (Array.isArray(res)) {
@@ -50,31 +48,30 @@ const getRem = (name, total, res = [], ignoreIdx = null) => {
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
-// --- FORMULARZ PRODUKTÓW ---
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
-        <div class="input-group"><label>Nazwa produktu</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="np. Jajka" required></div>
+        <div class="input-group"><label>Co to jest?</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="np. Jajka, Naprawa roweru" required></div>
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
             <div class="input-group"><label>Jednostka</label>
-                <select class="p-unit"><option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option><option value="kg" ${data.unit==='kg'?'selected':''}>kg</option><option value="g" ${data.unit==='g'?'selected':''}>g</option><option value="litr" ${data.unit==='litr'?'selected':''}>litr</option></select>
+                <select class="p-unit"><option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option><option value="kg" ${data.unit==='kg'?'selected':''}>kg</option><option value="g" ${data.unit==='g'?'selected':''}>g</option><option value="litr" ${data.unit==='litr'?'selected':''}>litr</option><option value="godz" ${data.unit==='godz'?'selected':''}>godz.</option></select>
             </div>
         </div>
         <div class="form-grid">
-            <div class="input-group"><label>Łączna ilość (pula)</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+            <div class="input-group"><label>Łączna ilość / Czas</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
             <div class="input-group"><label>Sposób dzielenia</label>
                 <select class="p-step">
-                    <option value="1" ${initialStep==1?'selected':''}>Tylko w całości (1, 2...)</option>
+                    <option value="1" ${initialStep==1?'selected':''}>W całości (1, 2...)</option>
                     <option value="0.5" ${initialStep==0.5?'selected':''}>Na połówki (0.5, 1...)</option>
                     <option value="0.25" ${initialStep==0.25?'selected':''}>Na ćwiartki (0.25...)</option>
-                    <option value="0.1" ${initialStep==0.1?'selected':''}>Co 100g (0.1, 0.2...)</option>
+                    <option value="0.1" ${initialStep==0.1?'selected':''}>Co 0.1</option>
                 </select>
             </div>
         </div>
-        <div class="input-group"><label>Zdjęcie produktu</label><input type="file" class="p-file" accept="image/*" style="border:none; padding:0;"></div>
+        <div class="input-group"><label>Zdjęcie</label><input type="file" class="p-file" accept="image/*" style="border:none; padding:0;"></div>
     `;
     return div;
 };
@@ -92,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-more-items').onclick = () => document.getElementById('products-to-add').appendChild(createProductFields());
 });
 
-// --- ZAPIS OFERTY ---
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn'); btn.disabled = true; btn.innerText = "Zapisywanie...";
@@ -111,6 +107,7 @@ document.getElementById('listing-form').onsubmit = async (e) => {
         });
     }
     const data = {
+        category: document.getElementById('category').value, // NOWE POLE
         sellerName: document.getElementById('sellerName').value, 
         sellerPhone: document.getElementById('sellerPhone').value,
         address: document.getElementById('pickupAddress').value,
@@ -129,7 +126,6 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     }
 };
 
-// --- ŁADOWANIE OGŁOSZEŃ ---
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
@@ -143,18 +139,22 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         
         hasValidOffers = true;
         const card = document.createElement('div'); card.className = 'product-card';
+        // HTML KARTY Z BADGE'EM KATEGORII
         card.innerHTML = `
             <div class="listing-header">
-                <h3>${d.sellerName}</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <h3>${d.sellerName}</h3>
+                    <span class="cat-badge">${d.category || '🛍️ Inne'}</span>
+                </div>
                 <p>📍 ${d.address} | 📞 ${d.sellerPhone || 'Brak telefonu'}</p>
                 <p class="pickup-info">⏰ Odbiór: ${d.pickupTimes}</p>
             </div>
             ${(d.items || []).map(it => {
                 const rem = getRem(it.name, it.totalQty, d.reservations || []);
-                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/60?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? 'var(--primary)' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
+                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/85?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? 'var(--primary)' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
             }).join('')}
             <div class="card-footer">
-                <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów / Zmień</button>
+                <button class="btn-primary-action" onclick="window.openOrderModal('${docSnap.id}')">🛒 Zamów / Zarezerwuj</button>
                 <button class="btn-manage-gear" onclick="window.authSeller('${docSnap.id}', '${d.pin}')">⚙️</button>
             </div>
         `;
@@ -166,7 +166,6 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
     }
 });
 
-// --- OKNO ZAMÓWIENIA ---
 window.openOrderModal = async (id, editIdx = null) => {
     currentEditId = id; editingResIndex = editIdx;
     const snap = await getDoc(doc(db, "listings", id)); const d = snap.data(); cachedListingData = d;
@@ -224,7 +223,6 @@ const lookUpOrder = () => {
 document.getElementById('buyerName').oninput = lookUpOrder;
 document.getElementById('buyerPin').oninput = lookUpOrder;
 
-// --- ZAPIS ZAMÓWIENIA ---
 document.getElementById('confirm-booking-btn').onclick = async () => {
     const name = document.getElementById('buyerName').value.trim();
     const phone = document.getElementById('buyerPhone').value.trim();
@@ -235,7 +233,7 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         const q = parseFloat(span.innerText); if(q > 0) items.push({ name: span.dataset.name, qty: q });
     });
 
-    if(!name || !phone || pin.length !== 4 || items.length === 0 || !time) return alert("Uzupełnij wszystkie dane kontaktowe i wybierz produkty!");
+    if(!name || !phone || pin.length !== 4 || items.length === 0 || !time) return alert("Uzupełnij wszystkie dane kontaktowe i wybierz pozycje!");
     
     localStorage.setItem('ryneczek_name', name); 
     localStorage.setItem('ryneczek_phone', phone);
@@ -257,7 +255,6 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     location.reload();
 };
 
-// --- PANEL SPRZEDAWCY ---
 window.authSeller = async (id, pin) => {
     const inputPin = prompt("Podaj PIN ogłoszenia:");
     if(inputPin !== pin) return alert("Błędny PIN!");
@@ -312,6 +309,9 @@ document.getElementById('view-by-product').onclick = () => renderSellerView('pro
 document.getElementById('btn-edit-offer').onclick = () => {
     isEditingOffer = true; const d = cachedListingData;
     document.getElementById('modal-title').innerText = "Edycja oferty";
+    
+    // Ustawienie wartości przy edycji
+    document.getElementById('category').value = d.category || '🛍️ Sprzedaż'; 
     document.getElementById('sellerName').value = d.sellerName;
     document.getElementById('sellerPhone').value = d.sellerPhone || '';
     document.getElementById('pickupAddress').value = d.address;
@@ -319,11 +319,13 @@ document.getElementById('btn-edit-offer').onclick = () => {
     document.getElementById('expiryDate').value = d.expiryDate || '';
     document.getElementById('pin').value = d.pin;
     document.getElementById('products-to-add').innerHTML = '';
+    
     (d.items || []).forEach(it => {
         const row = createProductFields(it);
         row.dataset.oldUrl = it.imageUrl;
         document.getElementById('products-to-add').appendChild(row);
     });
+    
     document.getElementById('seller-modal').classList.add('hidden');
     document.getElementById('add-listing-modal').classList.remove('hidden');
 };

@@ -29,14 +29,25 @@
             <h2 id="modal-title">Nowa oferta</h2>
             <form id="listing-form">
                 <div class="form-section">
-                    <h3>Twoje dane (Sprzedawca)</h3>
+                    <h3>Główne informacje</h3>
+                    
+                    <div class="input-group">
+                        <label>Kategoria ogłoszenia</label>
+                        <select id="category" required>
+                            <option value="🍞 Spożywka">🍞 Spożywka (ciasta, chleby, przetwory)</option>
+                            <option value="🪴 Ogrodowe">🪴 Ogrodowe (rośliny, plony)</option>
+                            <option value="🛠️ Usługi">🛠️ Usługi (pomoc, naprawy)</option>
+                            <option value="🛍️ Sprzedaż">🛍️ Sprzedaż (wszystko inne)</option>
+                        </select>
+                    </div>
+
                     <div class="form-grid">
                         <div class="input-group"><label>Imię / Nazwa</label><input type="text" id="sellerName" required></div>
                         <div class="input-group"><label>Telefon</label><input type="tel" id="sellerPhone" placeholder="np. 500 600 700" required></div>
                     </div>
-                    <div class="input-group"><label>Adres odbioru</label><input type="text" id="pickupAddress" placeholder="np. ul. Polna 4, klatka 2" required></div>
+                    <div class="input-group"><label>Adres odbioru/usługi</label><input type="text" id="pickupAddress" placeholder="np. ul. Polna 4, klatka 2" required></div>
                     <div class="form-grid">
-                        <div class="input-group"><label>Godziny odbioru</label><input type="text" id="pickupTimes" placeholder="np. Pon-Pt 17-20" required></div>
+                        <div class="input-group"><label>Kiedy (godziny)?</label><input type="text" id="pickupTimes" placeholder="np. Pon-Pt 17-20" required></div>
                         <div class="input-group"><label>Ważność oferty</label><input type="datetime-local" id="expiryDate" required></div>
                     </div>
                     <div class="input-group">
@@ -46,9 +57,9 @@
                 </div>
 
                 <div class="form-section">
-                    <h3>Produkty</h3>
+                    <h3>Produkty / Usługi</h3>
                     <div id="products-to-add"></div>
-                    <button type="button" id="add-more-items" class="btn-secondary-action">➕ Dodaj kolejny produkt</button>
+                    <button type="button" id="add-more-items" class="btn-secondary-action">➕ Dodaj kolejną pozycję</button>
                 </div>
 
                 <div class="modal-actions">
