@@ -19,7 +19,6 @@ let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
-// Zmienne do filtrowania
 let allListingsData = [];
 let currentCategoryFilter = 'all';
 
@@ -52,12 +51,23 @@ const getRem = (name, total, res = [], ignoreIdx = null) => {
 
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 
+window.openImage = (url) => {
+    document.getElementById('enlarged-image').src = url;
+    document.getElementById('image-modal').classList.remove('hidden');
+};
+
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
         <div class="input-group"><label>Co to jest?</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="np. Jajka, Naprawa roweru" required></div>
+        
+        <div class="input-group">
+            <label>Opis (np. składniki, wymiary, szczegóły)</label>
+            <textarea class="p-desc" placeholder="Wpisz dodatkowe informacje...">${data.description || ''}</textarea>
+        </div>
+
         <div class="form-grid">
             <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
             <div class="input-group"><label>Jednostka</label>
@@ -80,7 +90,6 @@ const createProductFields = (data = {}) => {
     return div;
 };
 
-// --- LOGIKA RYSOWANIA OFERT (Z FILTREM) ---
 const renderListingsUI = () => {
     const cont = document.getElementById('listings-container');
     if (!cont) return;
@@ -91,9 +100,8 @@ const renderListingsUI = () => {
     allListingsData.forEach(item => {
         const d = item.data;
         const docId = item.id;
-        const cat = d.category || '🛍️ Sprzedaż'; // Dla starych ogłoszeń
+        const cat = d.category || '🛍️ Sprzedaż'; 
 
-        // Sprawdzamy czy ogłoszenie pasuje do filtra
         if (currentCategoryFilter !== 'all' && cat !== currentCategoryFilter) return;
 
         hasValidOffers = true;
@@ -110,7 +118,22 @@ const renderListingsUI = () => {
             </div>
             ${(d.items || []).map(it => {
                 const rem = getRem(it.name, it.totalQty, d.reservations || []);
-                return `<div class="product-item-list"><img src="${it.imageUrl || 'https://via.placeholder.com/85?text=📦'}" class="thumb"><div style="flex:1"><b>${it.name}</b><br><small>${it.price} zł / ${it.unit}</small><br><small style="font-weight:bold; color:${rem > 0 ? 'var(--primary)' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small></div></div>`;
+                
+                // INTELIGENTNY BRAK ZDJĘCIA DLA LISTY GŁÓWNEJ
+                const imgHtml = it.imageUrl 
+                    ? `<img src="${it.imageUrl}" class="thumb" onclick="window.openImage('${it.imageUrl}')">`
+                    : `<div class="thumb" style="display:flex; align-items:center; justify-content:center; font-size:2rem; cursor:default;">📦</div>`;
+
+                return `
+                <div class="product-item-list">
+                    ${imgHtml}
+                    <div style="flex:1">
+                        <b>${it.name}</b>
+                        ${it.description ? `<div style="font-size:0.85rem; color:#6b7280; margin:4px 0;">${it.description}</div>` : ''}
+                        <small>${it.price} zł / ${it.unit}</small><br>
+                        <small style="font-weight:bold; color:${rem > 0 ? 'var(--primary)' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small>
+                    </div>
+                </div>`;
             }).join('')}
             <div class="card-footer">
                 <button class="btn-primary-action" onclick="window.openOrderModal('${docId}')">🛒 Zarezerwuj</button>
@@ -128,13 +151,12 @@ const renderListingsUI = () => {
 document.addEventListener('DOMContentLoaded', () => {
     cleanupExpired();
     
-    // Obsługa przycisków filtrujących
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             currentCategoryFilter = e.target.dataset.cat;
-            renderListingsUI(); // Błyskawiczne odświeżenie listy z pamięci
+            renderListingsUI(); 
         });
     });
 
@@ -161,9 +183,13 @@ document.getElementById('listing-form').onsubmit = async (e) => {
             await uploadBytes(sRef, file); imageUrl = await getDownloadURL(sRef);
         }
         products.push({
-            name: div.querySelector('.p-name').value, price: parseFloat(div.querySelector('.p-price').value),
-            unit: div.querySelector('.p-unit').value, totalQty: parseFloat(div.querySelector('.p-total').value),
-            step: parseFloat(div.querySelector('.p-step').value), imageUrl
+            name: div.querySelector('.p-name').value, 
+            description: div.querySelector('.p-desc').value, 
+            price: parseFloat(div.querySelector('.p-price').value),
+            unit: div.querySelector('.p-unit').value, 
+            totalQty: parseFloat(div.querySelector('.p-total').value),
+            step: parseFloat(div.querySelector('.p-step').value), 
+            imageUrl: imageUrl
         });
     }
     const data = {
@@ -186,10 +212,9 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     }
 };
 
-// Pobieranie ogłoszeń do pamięci lokalnej
 onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
     const now = new Date();
-    allListingsData = []; // Czyścimy listę
+    allListingsData = []; 
 
     snap.forEach(docSnap => {
         const d = docSnap.data();
@@ -197,7 +222,7 @@ onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (sna
         allListingsData.push({ id: docSnap.id, data: d });
     });
 
-    renderListingsUI(); // Rysujemy listę z uwzględnieniem aktualnego filtra
+    renderListingsUI(); 
 });
 
 window.openOrderModal = async (id, editIdx = null) => {
@@ -213,10 +238,22 @@ window.openOrderModal = async (id, editIdx = null) => {
         const startVal = (editingResIndex !== null && reservations[editIdx] && reservations[editIdx].items) 
             ? (reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
             
+        // INTELIGENTNY BRAK ZDJĘCIA DLA OKNA ZAMÓWIENIA
+        const imgHtml = it.imageUrl 
+            ? `<img src="${it.imageUrl}" style="width:60px; height:60px; border-radius:8px; object-fit:cover; cursor:pointer; flex-shrink:0;" onclick="window.openImage('${it.imageUrl}')">`
+            : `<div style="width:60px; height:60px; border-radius:8px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0;">📦</div>`;
+
         container.innerHTML += `
-            <div style="background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                <div style="flex:1"><b style="display:block">${it.name}</b><small style="color:var(--primary); font-weight:bold;">Dostępne: ${Number(rem.toFixed(2))}</small></div>
-                <div style="display:flex; align-items:center; gap:10px;">
+            <div style="background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:12px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px;">
+                    <div style="flex:1; padding-right:10px;">
+                        <b style="display:block; font-size:1.05rem;">${it.name}</b>
+                        ${it.description ? `<div style="font-size:0.85rem; color:#6b7280; margin:4px 0;">${it.description}</div>` : ''}
+                        <small style="color:var(--primary); font-weight:bold;">Dostępne: ${Number(rem.toFixed(2))}</small>
+                    </div>
+                    ${imgHtml}
+                </div>
+                <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px;">
                     <button type="button" class="qty-btn" onclick="const s = this.nextElementSibling; s.innerText = Number(Math.max(0, parseFloat(s.innerText) - ${it.step}).toFixed(2)); window.updateSum();">-</button>
                     <span class="order-qty-val" data-name="${it.name}" data-price="${it.price}" style="font-weight:bold; min-width:40px; text-align:center">${Number(startVal).toString()}</span>
                     <button type="button" class="qty-btn" onclick="const s = this.previousElementSibling; if(parseFloat(s.innerText)+${it.step}<=${rem}){s.innerText=Number((parseFloat(s.innerText)+${it.step}).toFixed(2));window.updateSum();}else{alert('Brak wystarczającej ilości w puli!');}">+</button>
