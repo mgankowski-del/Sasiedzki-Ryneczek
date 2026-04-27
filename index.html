@@ -126,6 +126,11 @@
         </div>
     </div>
 
+    <div id="image-modal" class="modal hidden" onclick="window.closeModals()" style="align-items: center; justify-content: center; z-index: 9999;">
+        <span class="close-btn" style="color: white; top: 20px; right: 20px; font-size: 2.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">&times;</span>
+        <img id="enlarged-image" src="" style="max-width: 95%; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); object-fit: contain;">
+    </div>
+
     <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -171,3 +171,32 @@ input:focus, select:focus { outline: none; border-color: var(--primary); box-sha
 .res-item-line { display: flex; justify-content: space-between; font-size: 0.95rem; padding: 4px 0; color: #4b5563;}
 .res-total-highlight { text-align: right; margin-top: 10px; font-weight: bold; color: var(--primary); font-size: 1.1rem; }
 .status-msg { text-align: center; color: #6b7280; font-size: 1.1rem; margin-top: 40px; }
+
+/* --- ZDJĘCIA I OPISY PRODUKTÓW --- */
+.thumb {
+    cursor: pointer; /* Zmienia kursor na "łapkę" sugerującą kliknięcie */
+    transition: transform 0.2s ease;
+}
+.thumb:active {
+    transform: scale(0.95); /* Lekki efekt wciśnięcia przy kliknięciu */
+}
+
+/* Pole tekstowe (textarea) dla opisu */
+textarea {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #111827;
+    font-size: 16px; /* Blokuje zoom w iOS */
+    box-sizing: border-box;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 80px;
+}
+textarea:focus { 
+    outline: none; 
+    border-color: var(--primary); 
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); 
+}
