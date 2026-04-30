@@ -56,20 +56,30 @@ window.openImage = (url) => {
     document.getElementById('image-modal').classList.remove('hidden');
 };
 
+// ZMODYFIKOWANA FUNKCJA: DODANY CHECKBOX "ZA DARMO"
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
+    const isFree = data.price === 0; // Sprawdza, czy podczas edycji cena to 0
+
     div.innerHTML = `
-        <div class="input-group"><label>Nazwa (np. Produkt, Typ konsultacji)</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="np. Jajka, Sparing" required></div>
+        <div class="input-group"><label>Nazwa (np. Książka, Jajka, Konsultacja)</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="Co oferujesz?" required></div>
         
         <div class="input-group">
-            <label>Opis (np. składniki, wymiary, szczegóły)</label>
+            <label>Opis (szczegóły, wymiary, stan)</label>
             <textarea class="p-desc" placeholder="Wpisz dodatkowe informacje...">${data.description || ''}</textarea>
         </div>
 
         <div class="form-grid">
-            <div class="input-group"><label>Cena (zł)</label><input type="number" class="p-price" step="0.01" value="${data.price || ''}" required></div>
+            <div class="input-group">
+                <label>Cena (zł)</label>
+                <input type="number" class="p-price" step="0.01" value="${data.price !== undefined ? data.price : ''}" ${isFree ? 'disabled' : ''} required>
+                
+                <label style="display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer; font-weight:bold; color:var(--primary); font-size: 0.85rem;">
+                    <input type="checkbox" class="p-free-cb" ${isFree ? 'checked' : ''} style="width: 18px; height: 18px;"> 🎁 Oddam za darmo
+                </label>
+            </div>
             <div class="input-group"><label>Jednostka</label>
                 <select class="p-unit"><option value="szt" ${data.unit==='szt'?'selected':''}>szt.</option><option value="kg" ${data.unit==='kg'?'selected':''}>kg</option><option value="g" ${data.unit==='g'?'selected':''}>g</option><option value="litr" ${data.unit==='litr'?'selected':''}>litr</option><option value="godz" ${data.unit==='godz'?'selected':''}>godz.</option></select>
             </div>
@@ -87,10 +97,25 @@ const createProductFields = (data = {}) => {
         </div>
         <div class="input-group"><label>Zdjęcie</label><input type="file" class="p-file" accept="image/*" style="border:none; padding:0;"></div>
     `;
+
+    // Logika wyłączania pola ceny, gdy zaznaczono "Za darmo"
+    const freeCb = div.querySelector('.p-free-cb');
+    const priceInput = div.querySelector('.p-price');
+    
+    freeCb.onchange = (e) => {
+        if (e.target.checked) {
+            priceInput.value = 0;
+            priceInput.disabled = true; // Blokuje pole
+        } else {
+            priceInput.value = '';
+            priceInput.disabled = false; // Odblokowuje pole
+        }
+    };
+
     return div;
 };
 
-// --- LOGIKA NOWEGO CENNIKA USŁUG ---
+// --- LOGIKA CENNIKA USŁUG ---
 const enablePriceCheckbox = document.getElementById('enablePriceList');
 const priceInputsDiv = document.getElementById('priceListInputs');
 const priceRowsContainer = document.getElementById('priceRowsContainer');
@@ -115,7 +140,7 @@ function addPriceRow(label = '', val = '') {
     priceRowsContainer.appendChild(div);
 }
 document.getElementById('addPriceRowBtn').onclick = () => addPriceRow();
-// -----------------------------------
+// -----------------------------
 
 const renderListingsUI = () => {
     const cont = document.getElementById('listings-container');
@@ -161,13 +186,18 @@ const renderListingsUI = () => {
                     ? `<img src="${it.imageUrl}" class="thumb" onclick="window.openImage('${it.imageUrl}')">`
                     : `<div class="thumb" style="display:flex; align-items:center; justify-content:center; font-size:2rem; cursor:default;">📦</div>`;
 
+                // Logika "Za darmo" na froncie
+                const displayPrice = (it.price === 0) 
+                    ? `<span style="color:var(--primary); font-weight:800; text-transform:uppercase;">🎁 Za darmo!</span>` 
+                    : `${it.price} zł / ${it.unit}`;
+
                 return `
                 <div class="product-item-list">
                     ${imgHtml}
                     <div style="flex:1">
                         <b>${it.name}</b>
                         ${it.description ? `<div style="font-size:0.85rem; color:#6b7280; margin:4px 0;">${it.description}</div>` : ''}
-                        <small>${it.price} zł / ${it.unit}</small><br>
+                        <div style="margin: 4px 0;">${displayPrice}</div>
                         <small style="font-weight:bold; color:${rem > 0 ? 'var(--primary)' : '#ef4444'}">Dostępne: ${Number(rem.toFixed(2))} ${it.unit}</small>
                     </div>
                 </div>`;
@@ -205,7 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('products-to-add').innerHTML = '';
         document.getElementById('products-to-add').appendChild(createProductFields());
         
-        // Reset Cennika
         enablePriceCheckbox.checked = false;
         priceInputsDiv.classList.add('hidden');
         priceRowsContainer.innerHTML = '';
@@ -239,7 +268,7 @@ document.getElementById('listing-form').onsubmit = async (e) => {
         products.push({
             name: div.querySelector('.p-name').value, 
             description: div.querySelector('.p-desc').value, 
-            price: parseFloat(div.querySelector('.p-price').value),
+            price: parseFloat(div.querySelector('.p-price').value), // 0 zostanie ładnie zapisane
             unit: div.querySelector('.p-unit').value, 
             totalQty: parseFloat(div.querySelector('.p-total').value),
             step: parseFloat(div.querySelector('.p-step').value), 
@@ -298,12 +327,15 @@ window.openOrderModal = async (id, editIdx = null) => {
             ? `<img src="${it.imageUrl}" style="width:60px; height:60px; border-radius:8px; object-fit:cover; cursor:pointer; flex-shrink:0;" onclick="window.openImage('${it.imageUrl}')">`
             : `<div style="width:60px; height:60px; border-radius:8px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0;">📦</div>`;
 
+        // Pokazywanie ceny w koszyku (lub 'Za darmo')
+        const cartDisplayPrice = (it.price === 0) ? "🎁 ZA DARMO" : `Cena: ${it.price} zł / ${it.unit}`;
+
         container.innerHTML += `
             <div style="background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:12px; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px;">
                     <div style="flex:1; padding-right:10px;">
                         <b style="display:block; font-size:1.05rem;">${it.name}</b>
-                        ${it.description ? `<div style="font-size:0.85rem; color:#6b7280; margin:4px 0;">${it.description}</div>` : ''}
+                        <small style="color:#6b7280; display:block; margin:4px 0;">${cartDisplayPrice}</small>
                         <small style="color:var(--primary); font-weight:bold;">Dostępne: ${Number(rem.toFixed(2))}</small>
                     </div>
                     ${imgHtml}
@@ -333,7 +365,10 @@ window.openOrderModal = async (id, editIdx = null) => {
 };
 
 window.updateSum = () => {
-    let total = 0; document.querySelectorAll('.order-qty-val').forEach(span => { total += parseFloat(span.innerText) * parseFloat(span.dataset.price); });
+    let total = 0; 
+    document.querySelectorAll('.order-qty-val').forEach(span => { 
+        total += parseFloat(span.innerText) * parseFloat(span.dataset.price); 
+    });
     document.getElementById('modal-total-price').innerText = total.toFixed(2);
 };
 
@@ -409,7 +444,7 @@ const renderSellerView = (type) => {
                     </div>
                     <small style="background:#e5e7eb; padding:4px 8px; border-radius:6px; font-weight:bold;">⏰ ${r.time || 'Brak'}</small>
                 </div>
-                ${itemsRows}<div class="res-total-highlight">Z koszyka: ${pTotal.toFixed(2)} zł</div>
+                ${itemsRows}<div class="res-total-highlight">Suma rezerwacji: ${pTotal.toFixed(2)} zł</div>
             </div>`;
         });
     } else {
@@ -423,7 +458,7 @@ const renderSellerView = (type) => {
             container.innerHTML += `<div class="res-card-ui">
                 <div class="res-card-header"><b style="color:#374151; font-size:1.1rem;">📦 ${product.name}</b><small style="background:#e5e7eb; padding:4px 8px; border-radius:6px; font-weight:bold;">Zarezerwowano: ${tSold}/${product.totalQty}</small></div>
                 ${bRows || '<small style="color:#9ca3af; display:block; padding:10px 0;">Brak zamówień</small>'}
-                <div class="res-total-highlight">Wartość: ${pGrand.toFixed(2)} zł</div>
+                <div class="res-total-highlight">Wartość rezerwacji: ${pGrand.toFixed(2)} zł</div>
             </div>`;
         });
     }
@@ -443,28 +478,8 @@ document.getElementById('btn-edit-offer').onclick = () => {
     document.getElementById('expiryDate').value = d.expiryDate || '';
     document.getElementById('pin').value = d.pin;
     
-    // Odtwarzanie cennika usług
     document.getElementById('priceRowsContainer').innerHTML = '';
     if (d.servicePrices && d.servicePrices.length > 0) {
         enablePriceCheckbox.checked = true;
         document.getElementById('priceListInputs').classList.remove('hidden');
-        d.servicePrices.forEach(p => addPriceRow(p.label, p.val));
-    } else {
-        enablePriceCheckbox.checked = false;
-        document.getElementById('priceListInputs').classList.add('hidden');
-    }
-
-    document.getElementById('products-to-add').innerHTML = '';
-    (d.items || []).forEach(it => {
-        const row = createProductFields(it);
-        row.dataset.oldUrl = it.imageUrl;
-        document.getElementById('products-to-add').appendChild(row);
-    });
-    
-    document.getElementById('seller-modal').classList.add('hidden');
-    document.getElementById('add-listing-modal').classList.remove('hidden');
-};
-
-document.getElementById('btn-delete-offer').onclick = async () => {
-    if(confirm("Czy na pewno chcesz usunąć całe ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); }
-};
+        d.servicePrices.forEach(p => addPriceRow(p
