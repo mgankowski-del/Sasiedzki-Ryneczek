@@ -61,7 +61,7 @@ const createProductFields = (data = {}) => {
     div.className = 'product-form-box';
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
     div.innerHTML = `
-        <div class="input-group"><label>Co to jest?</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="np. Jajka, Naprawa roweru" required></div>
+        <div class="input-group"><label>Nazwa (np. Produkt, Typ konsultacji)</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="np. Jajka, Sparing" required></div>
         
         <div class="input-group">
             <label>Opis (np. składniki, wymiary, szczegóły)</label>
@@ -75,7 +75,7 @@ const createProductFields = (data = {}) => {
             </div>
         </div>
         <div class="form-grid">
-            <div class="input-group"><label>Łączna ilość / Czas</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
+            <div class="input-group"><label>Łączna ilość / Czas (wpisz 1 dla usług)</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
             <div class="input-group"><label>Sposób dzielenia</label>
                 <select class="p-step">
                     <option value="1" ${initialStep==1?'selected':''}>W całości (1, 2...)</option>
@@ -89,6 +89,33 @@ const createProductFields = (data = {}) => {
     `;
     return div;
 };
+
+// --- LOGIKA NOWEGO CENNIKA USŁUG ---
+const enablePriceCheckbox = document.getElementById('enablePriceList');
+const priceInputsDiv = document.getElementById('priceListInputs');
+const priceRowsContainer = document.getElementById('priceRowsContainer');
+
+enablePriceCheckbox.onchange = (e) => {
+    if(e.target.checked) {
+        priceInputsDiv.classList.remove('hidden');
+        if (priceRowsContainer.children.length === 0) addPriceRow();
+    } else {
+        priceInputsDiv.classList.add('hidden');
+    }
+};
+
+function addPriceRow(label = '', val = '') {
+    const div = document.createElement('div');
+    div.className = 'price-input-row';
+    div.innerHTML = `
+        <input type="text" class="p-row-label" placeholder="np. 45 min" value="${label}" style="flex:2">
+        <input type="number" class="p-row-val" placeholder="cena" value="${val}" style="flex:1">
+        <button type="button" onclick="this.parentElement.remove()" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold; font-size:1.2rem;">&times;</button>
+    `;
+    priceRowsContainer.appendChild(div);
+}
+document.getElementById('addPriceRowBtn').onclick = () => addPriceRow();
+// -----------------------------------
 
 const renderListingsUI = () => {
     const cont = document.getElementById('listings-container');
@@ -107,6 +134,18 @@ const renderListingsUI = () => {
         hasValidOffers = true;
         const card = document.createElement('div'); 
         card.className = 'product-card';
+        
+        let priceTableHtml = '';
+        if (d.servicePrices && d.servicePrices.length > 0) {
+            priceTableHtml = `
+                <div class="card-price-table">
+                    ${d.servicePrices.map(p => `
+                        <div class="price-line"><span>${p.label}</span><b>${p.val} zł</b></div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
         card.innerHTML = `
             <div class="listing-header">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
@@ -118,8 +157,6 @@ const renderListingsUI = () => {
             </div>
             ${(d.items || []).map(it => {
                 const rem = getRem(it.name, it.totalQty, d.reservations || []);
-                
-                // INTELIGENTNY BRAK ZDJĘCIA DLA LISTY GŁÓWNEJ
                 const imgHtml = it.imageUrl 
                     ? `<img src="${it.imageUrl}" class="thumb" onclick="window.openImage('${it.imageUrl}')">`
                     : `<div class="thumb" style="display:flex; align-items:center; justify-content:center; font-size:2rem; cursor:default;">📦</div>`;
@@ -135,8 +172,9 @@ const renderListingsUI = () => {
                     </div>
                 </div>`;
             }).join('')}
+            ${priceTableHtml}
             <div class="card-footer">
-                <button class="btn-primary-action" onclick="window.openOrderModal('${docId}')">🛒 Zarezerwuj</button>
+                <button class="btn-primary-action" onclick="window.openOrderModal('${docId}')">🛒 Zarezerwuj / Skontaktuj</button>
                 <button class="btn-manage-gear" onclick="window.authSeller('${docId}', '${d.pin}')">⚙️</button>
             </div>
         `;
@@ -166,6 +204,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('listing-form').reset();
         document.getElementById('products-to-add').innerHTML = '';
         document.getElementById('products-to-add').appendChild(createProductFields());
+        
+        // Reset Cennika
+        enablePriceCheckbox.checked = false;
+        priceInputsDiv.classList.add('hidden');
+        priceRowsContainer.innerHTML = '';
+
         document.getElementById('add-listing-modal').classList.remove('hidden');
     };
     document.getElementById('add-more-items').onclick = () => document.getElementById('products-to-add').appendChild(createProductFields());
@@ -174,6 +218,16 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('listing-form').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn'); btn.disabled = true; btn.innerText = "Zapisywanie...";
+    
+    const servicePrices = [];
+    if(enablePriceCheckbox.checked) {
+        document.querySelectorAll('.price-input-row').forEach(row => {
+            const l = row.querySelector('.p-row-label').value.trim();
+            const v = row.querySelector('.p-row-val').value.trim();
+            if(l && v) servicePrices.push({ label: l, val: v });
+        });
+    }
+
     const products = [];
     for (const div of document.querySelectorAll('.product-form-box')) {
         const file = div.querySelector('.p-file').files[0];
@@ -199,7 +253,9 @@ document.getElementById('listing-form').onsubmit = async (e) => {
         address: document.getElementById('pickupAddress').value,
         pickupTimes: document.getElementById('pickupTimes').value, 
         expiryDate: document.getElementById('expiryDate').value,
-        pin: document.getElementById('pin').value, items: products, 
+        pin: document.getElementById('pin').value, 
+        items: products,
+        servicePrices: servicePrices,
         updatedAt: new Date(), reservations: cachedListingData?.reservations || []
     };
     try {
@@ -238,7 +294,6 @@ window.openOrderModal = async (id, editIdx = null) => {
         const startVal = (editingResIndex !== null && reservations[editIdx] && reservations[editIdx].items) 
             ? (reservations[editIdx].items.find(i => i.name === it.name)?.qty || 0) : 0;
             
-        // INTELIGENTNY BRAK ZDJĘCIA DLA OKNA ZAMÓWIENIA
         const imgHtml = it.imageUrl 
             ? `<img src="${it.imageUrl}" style="width:60px; height:60px; border-radius:8px; object-fit:cover; cursor:pointer; flex-shrink:0;" onclick="window.openImage('${it.imageUrl}')">`
             : `<div style="width:60px; height:60px; border-radius:8px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0;">📦</div>`;
@@ -304,7 +359,7 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
         const q = parseFloat(span.innerText); if(q > 0) items.push({ name: span.dataset.name, qty: q });
     });
 
-    if(!name || !phone || pin.length !== 4 || items.length === 0 || !time) return alert("Uzupełnij wszystkie dane kontaktowe i wybierz pozycje!");
+    if(!name || !phone || pin.length !== 4 || !time) return alert("Uzupełnij wszystkie dane kontaktowe!");
     
     localStorage.setItem('ryneczek_name', name); 
     localStorage.setItem('ryneczek_phone', phone);
@@ -322,7 +377,7 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     }
     await updateDoc(refL, { reservations: res }); 
     window.closeModals();
-    alert("Super! Zamówienie zostało zarejestrowane.");
+    alert("Super! Zamówienie/Wiadomość zostało wysłane do sprzedawcy.");
     location.reload();
 };
 
@@ -354,7 +409,7 @@ const renderSellerView = (type) => {
                     </div>
                     <small style="background:#e5e7eb; padding:4px 8px; border-radius:6px; font-weight:bold;">⏰ ${r.time || 'Brak'}</small>
                 </div>
-                ${itemsRows}<div class="res-total-highlight">Do zapłaty: ${pTotal.toFixed(2)} zł</div>
+                ${itemsRows}<div class="res-total-highlight">Z koszyka: ${pTotal.toFixed(2)} zł</div>
             </div>`;
         });
     } else {
@@ -387,8 +442,19 @@ document.getElementById('btn-edit-offer').onclick = () => {
     document.getElementById('pickupTimes').value = d.pickupTimes;
     document.getElementById('expiryDate').value = d.expiryDate || '';
     document.getElementById('pin').value = d.pin;
-    document.getElementById('products-to-add').innerHTML = '';
     
+    // Odtwarzanie cennika usług
+    document.getElementById('priceRowsContainer').innerHTML = '';
+    if (d.servicePrices && d.servicePrices.length > 0) {
+        enablePriceCheckbox.checked = true;
+        document.getElementById('priceListInputs').classList.remove('hidden');
+        d.servicePrices.forEach(p => addPriceRow(p.label, p.val));
+    } else {
+        enablePriceCheckbox.checked = false;
+        document.getElementById('priceListInputs').classList.add('hidden');
+    }
+
+    document.getElementById('products-to-add').innerHTML = '';
     (d.items || []).forEach(it => {
         const row = createProductFields(it);
         row.dataset.oldUrl = it.imageUrl;

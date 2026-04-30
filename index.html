@@ -2,74 +2,76 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Sąsiedzki Ryneczek</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kort Tenisowy - Ryneczek</title>
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="icon" href="apple-touch-icon.png">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
         <header class="main-header">
-            <h1>🍏 Sąsiedzki Ryneczek</h1>
-            <p class="subtitle">Lokalne oferty i usługi od Twoich sąsiadów</p>
-            <button id="btn-open-add" class="btn-add-main">➕ Dodaj swoją ofertę</button>
+            <h1>🏠 Sąsiedzki Ryneczek</h1>
+            <p class="subtitle">Usługi, handel i jedzenie od sąsiadów</p>
+            <button id="btn-open-add" class="btn-add-main">+ Wystaw ogłoszenie / usługę</button>
         </header>
 
         <div class="category-filters">
             <button class="filter-btn active" data-cat="all">Wszystko</button>
-            <button class="filter-btn" data-cat="🍞 Spożywka">🍞 Spożywka</button>
-            <button class="filter-btn" data-cat="🪴 Ogrodowe">🪴 Ogrodowe</button>
-            <button class="filter-btn" data-cat="🛠️ Usługi">🛠️ Usługi</button>
             <button class="filter-btn" data-cat="🛍️ Sprzedaż">🛍️ Sprzedaż</button>
+            <button class="filter-btn" data-cat="🍕 Jedzenie">🍕 Jedzenie</button>
+            <button class="filter-btn" data-cat="🛠️ Usługi">🛠️ Usługi</button>
         </div>
-        
-        <main id="listings-container">
-            <div class="status-msg">Ładowanie ofert...</div>
-        </main>
+
+        <div id="listings-container"></div>
     </div>
 
     <div id="add-listing-modal" class="modal hidden">
         <div class="modal-content">
             <span class="close-btn" onclick="window.closeModals()">&times;</span>
             <h2 id="modal-title">Nowa oferta</h2>
+            
             <form id="listing-form">
                 <div class="form-section">
-                    <h3>Główne informacje</h3>
                     <div class="input-group">
-                        <label>Kategoria ogłoszenia</label>
-                        <select id="category" required>
-                            <option value="🍞 Spożywka">🍞 Spożywka (ciasta, chleby, przetwory)</option>
-                            <option value="🪴 Ogrodowe">🪴 Ogrodowe (rośliny, plony)</option>
-                            <option value="🛠️ Usługi">🛠️ Usługi (pomoc, naprawy)</option>
-                            <option value="🛍️ Sprzedaż">🛍️ Sprzedaż (wszystko inne)</option>
+                        <label>Kategoria</label>
+                        <select id="category">
+                            <option value="🛍️ Sprzedaż">🛍️ Sprzedaż (rzeczy, przedmioty)</option>
+                            <option value="🍕 Jedzenie">🍕 Jedzenie (wypieki, obiady)</option>
+                            <option value="🛠️ Usługi">🛠️ Usługi (naprawy, pomoc, lekcje)</option>
                         </select>
                     </div>
                     <div class="form-grid">
-                        <div class="input-group"><label>Imię / Nazwa</label><input type="text" id="sellerName" required></div>
-                        <div class="input-group"><label>Telefon</label><input type="tel" id="sellerPhone" placeholder="np. 500 600 700" required></div>
+                        <div class="input-group"><label>Twoje Imię / Nazwa</label><input type="text" id="sellerName" required></div>
+                        <div class="input-group"><label>Telefon</label><input type="tel" id="sellerPhone" required></div>
                     </div>
-                    <div class="input-group"><label>Adres odbioru/usługi</label><input type="text" id="pickupAddress" placeholder="np. ul. Polna 4, klatka 2" required></div>
+                    <div class="input-group"><label>Adres (nr domu)</label><input type="text" id="pickupAddress" required></div>
+                    <div class="input-group"><label>Kiedy dostępne / Godziny</label><input type="text" id="pickupTimes" placeholder="np. Pon-Pt 17-20"></div>
                     <div class="form-grid">
-                        <div class="input-group"><label>Kiedy (godziny)?</label><input type="text" id="pickupTimes" placeholder="np. Pon-Pt 17-20" required></div>
-                        <div class="input-group"><label>Ważność oferty</label><input type="datetime-local" id="expiryDate" required></div>
+                        <div class="input-group"><label>Ważne do (opcjonalnie)</label><input type="date" id="expiryDate"></div>
+                        <div class="input-group"><label>PIN (do edycji)</label><input type="number" id="pin" required></div>
                     </div>
-                    <div class="input-group">
-                        <label>PIN ogłoszenia (4 cyfry do edycji)</label>
-                        <input type="text" inputmode="numeric" id="pin" maxlength="4" pattern="\d{4}" required>
+                </div>
+
+                <div class="service-price-box">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; color: var(--primary);">
+                        <input type="checkbox" id="enablePriceList" style="width: 20px; height: 20px;"> 💰 Dodaj specyficzny cennik (np. dla usług)
+                    </label>
+                    <div id="priceListInputs" class="hidden" style="margin-top: 15px;">
+                        <div id="priceRowsContainer"></div>
+                        <button type="button" id="addPriceRowBtn" class="btn-secondary-action" style="margin-top: 10px; padding: 8px;">+ Dodaj kolejną pozycję</button>
                     </div>
                 </div>
 
                 <div class="form-section">
-                    <h3>Produkty / Usługi</h3>
+                    <h3>Zdjęcia i stany magazynowe (dla rzeczy)</h3>
+                    <p style="font-size: 0.8rem; color: #6b7280; margin-bottom: 10px;">Jeśli oferujesz usługę (i wypełniłeś cennik wyżej), możesz zostawić jedno pole i wpisać np. "1 szt". Jeśli sprzedajesz rzeczy - dodaj zdjęcia i ilość.</p>
                     <div id="products-to-add"></div>
-                    <button type="button" id="add-more-items" class="btn-secondary-action">➕ Dodaj kolejną pozycję</button>
+                    <button type="button" id="add-more-items" class="btn-secondary-action">+ Dodaj kolejny przedmiot ze zdjęciem</button>
                 </div>
 
-                <div class="modal-actions">
-                    <button type="submit" id="submitBtn" class="btn-primary-action">Opublikuj ofertę</button>
+                <div style="margin-top: 20px;">
+                    <button type="submit" id="submitBtn" class="btn-add-main">Opublikuj ofertę</button>
                 </div>
             </form>
         </div>
@@ -78,35 +80,22 @@
     <div id="reservation-modal" class="modal hidden">
         <div class="modal-content">
             <span class="close-btn" onclick="window.closeModals()">&times;</span>
-            <h2>Twoje zamówienie</h2>
+            <h2>Zarezerwuj / Zamów</h2>
+            <p id="modal-pickup-info" style="font-size:0.9rem; color:#6b7280; margin-bottom:15px;"></p>
             <div id="modal-order-items"></div>
             
-            <div class="total-bar">
-                <span>Razem do zapłaty:</span>
-                <span><span id="modal-total-price">0.00</span> zł</span>
-            </div>
+            <div class="total-bar"> Suma z koszyka: <span id="modal-total-price">0</span> zł </div>
+            <p style="font-size: 0.8rem; color: #6b7280; margin-bottom: 15px;">*Jeśli zamawiasz usługę z cennika, kwota zależy od indywidualnych ustaleń.</p>
 
             <div class="form-section">
-                <h3>Twoje dane kontaktowe</h3>
+                <div class="input-group"><label>Twoje Imię</label><input type="text" id="buyerName"></div>
                 <div class="form-grid">
-                    <div class="input-group"><label>Twoje imię</label><input type="text" id="buyerName" required></div>
-                    <div class="input-group"><label>Twój telefon (dla sprzedawcy)</label><input type="tel" id="buyerPhone" placeholder="np. 500 600 700" required></div>
+                    <div class="input-group"><label>Telefon</label><input type="tel" id="buyerPhone"></div>
+                    <div class="input-group"><label>Twój PIN</label><input type="number" id="buyerPin"></div>
                 </div>
-                <div class="form-grid">
-                    <div class="input-group">
-                        <label>Kiedy odbierzesz? <span id="modal-pickup-info"></span></label>
-                        <input type="text" id="buyerPickupTime" placeholder="np. Dziś o 18:00" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Twój PIN (do ew. zmian)</label>
-                        <input type="text" inputmode="numeric" id="buyerPin" maxlength="4" pattern="\d{4}" required>
-                    </div>
-                </div>
+                <div class="input-group"><label>Kiedy skorzystasz/odbierzesz?</label><input type="text" id="buyerPickupTime"></div>
             </div>
-
-            <div class="modal-actions">
-                <button type="button" id="confirm-booking-btn" class="btn-primary-action">Zatwierdź zamówienie</button>
-            </div>
+            <button id="confirm-booking-btn" class="btn-add-main">Wyślij zamówienie</button>
         </div>
     </div>
 
@@ -115,20 +104,19 @@
             <span class="close-btn" onclick="window.closeModals()">&times;</span>
             <h2>Zarządzanie ofertą</h2>
             <div class="tabs">
-                <button id="view-by-person" class="tab active">👤 Zamówienia</button>
-                <button id="view-by-product" class="tab">📦 Stan produktów</button>
+                <button class="tab active" id="view-by-person">Zamówienia</button>
+                <button class="tab" id="view-by-product">Magazyn</button>
             </div>
             <div id="reservations-container"></div>
-            <div class="modal-actions" style="margin-top: 20px;">
-                <button type="button" id="btn-edit-offer" class="btn-warning-action">✏️ Edytuj ofertę</button>
-                <button type="button" id="btn-delete-offer" class="btn-danger-action">🗑️ Usuń ofertę</button>
+            <div style="margin-top:20px; display:flex; gap:10px;">
+                <button id="btn-edit-offer" class="btn-warning-action">Edytuj</button>
+                <button id="btn-delete-offer" class="btn-danger-action">Usuń wszystko</button>
             </div>
         </div>
     </div>
 
-    <div id="image-modal" class="modal hidden" onclick="window.closeModals()" style="align-items: center; justify-content: center; z-index: 9999;">
-        <span class="close-btn" style="color: white; top: 20px; right: 20px; font-size: 2.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">&times;</span>
-        <img id="enlarged-image" src="" style="max-width: 95%; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); object-fit: contain;">
+    <div id="image-modal" class="modal hidden" onclick="window.closeModals()">
+        <img id="enlarged-image" style="max-width:95%; max-height:90vh; border-radius:12px; margin:auto;">
     </div>
 
     <script type="module" src="app.js"></script>

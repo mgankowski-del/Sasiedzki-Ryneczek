@@ -33,40 +33,19 @@ body {
 
 /* --- FILTRY KATEGORII --- */
 .category-filters {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    padding: 5px 15px 20px 15px;
-    margin: 0 -15px; 
-    -webkit-overflow-scrolling: touch; 
-    scrollbar-width: none; 
+    display: flex; gap: 10px; overflow-x: auto; padding: 5px 15px 20px 15px;
+    margin: 0 -15px; -webkit-overflow-scrolling: touch; scrollbar-width: none; 
 }
-.category-filters::-webkit-scrollbar {
-    display: none; 
-}
-/* Wymusza pustą przestrzeń na końcu scrolla dla Safari */
-.category-filters::after {
-    content: '';
-    padding-right: 1px; 
-}
+.category-filters::-webkit-scrollbar { display: none; }
+.category-filters::after { content: ''; padding-right: 1px; }
 .filter-btn {
-    flex-shrink: 0; /* Zapobiega zgniataniu przycisków na małych ekranach */
-    background: white;
-    border: 1px solid var(--border-color);
-    color: #4b5563;
-    padding: 10px 18px;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 0.95rem;
-    white-space: nowrap; 
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
-    transition: all 0.2s ease;
+    flex-shrink: 0; background: white; border: 1px solid var(--border-color);
+    color: #4b5563; padding: 10px 18px; border-radius: 20px; font-weight: bold;
+    font-size: 0.95rem; white-space: nowrap; cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03); transition: all 0.2s ease;
 }
 .filter-btn.active {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
+    background: var(--primary); color: white; border-color: var(--primary);
     box-shadow: 0 4px 8px rgba(16, 185, 129, 0.2);
 }
 
@@ -80,14 +59,8 @@ body {
 .listing-header { padding: 16px; background: #f9fafb; border-bottom: 1px solid var(--border-color); }
 
 .cat-badge {
-    background: #ecfdf5;
-    color: var(--primary);
-    border: 1px solid #a7f3d0;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    white-space: nowrap;
+    background: #ecfdf5; color: var(--primary); border: 1px solid #a7f3d0;
+    padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; white-space: nowrap;
 }
 
 .listing-header h3 { margin: 0; font-size: 1.2rem; color: #111827; }
@@ -99,15 +72,11 @@ body {
     border-bottom: 1px solid #f3f4f6; gap: 16px; 
 }
 .thumb { 
-    width: 85px; 
-    height: 85px; 
-    border-radius: 12px; 
-    object-fit: cover; 
-    background: #f3f4f6;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    flex-shrink: 0;
+    width: 85px; height: 85px; border-radius: 12px; object-fit: cover; 
+    background: #f3f4f6; border: 1px solid var(--border-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05); flex-shrink: 0; cursor: pointer; transition: transform 0.2s ease;
 }
+.thumb:active { transform: scale(0.95); }
 
 .card-footer { padding: 16px; display: flex; gap: 10px; background: #fff; }
 .btn-primary-action { 
@@ -115,17 +84,13 @@ body {
     padding: 14px; border-radius: 10px; font-weight: bold; 
     cursor: pointer; flex: 1; font-size: 1rem;
 }
-.btn-manage-gear { 
-    background: #e5e7eb; color: #374151; border: none; 
-    width: 50px; border-radius: 10px; cursor: pointer; font-size: 1.2rem; 
-}
+.btn-manage-gear { background: #e5e7eb; color: #374151; border: none; width: 50px; border-radius: 10px; cursor: pointer; font-size: 1.2rem; }
 
 /* MODALE */
 .modal { 
     position: fixed; inset: 0; background: rgba(0,0,0,0.6); 
     display: flex; justify-content: center; align-items: flex-start; 
-    z-index: 2000; padding: 20px; 
-    overflow-y: auto; -webkit-overflow-scrolling: touch; 
+    z-index: 2000; padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; 
 }
 .modal-content { 
     background: var(--card-bg); border-radius: 20px; padding: 20px; 
@@ -145,10 +110,15 @@ body {
 .input-group label { font-size: 0.85rem; font-weight: bold; color: #4b5563; margin-bottom: 5px; }
 input, select { 
     padding: 12px; border-radius: 8px; border: 1px solid #d1d5db; 
-    background: #fff; color: #111827; font-size: 16px; 
-    box-sizing: border-box; width: 100%;
+    background: #fff; color: #111827; font-size: 16px; box-sizing: border-box; width: 100%;
 }
-input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
+
+textarea {
+    width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #d1d5db;
+    background: #fff; color: #111827; font-size: 16px; box-sizing: border-box;
+    font-family: inherit; resize: vertical; min-height: 80px;
+}
 
 .product-form-box { background: #f9fafb; border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; margin-bottom: 15px; }
 
@@ -172,31 +142,9 @@ input:focus, select:focus { outline: none; border-color: var(--primary); box-sha
 .res-total-highlight { text-align: right; margin-top: 10px; font-weight: bold; color: var(--primary); font-size: 1.1rem; }
 .status-msg { text-align: center; color: #6b7280; font-size: 1.1rem; margin-top: 40px; }
 
-/* --- ZDJĘCIA I OPISY PRODUKTÓW --- */
-.thumb {
-    cursor: pointer; /* Zmienia kursor na "łapkę" sugerującą kliknięcie */
-    transition: transform 0.2s ease;
-}
-.thumb:active {
-    transform: scale(0.95); /* Lekki efekt wciśnięcia przy kliknięciu */
-}
-
-/* Pole tekstowe (textarea) dla opisu */
-textarea {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #d1d5db;
-    background: #fff;
-    color: #111827;
-    font-size: 16px; /* Blokuje zoom w iOS */
-    box-sizing: border-box;
-    font-family: inherit;
-    resize: vertical;
-    min-height: 80px;
-}
-textarea:focus { 
-    outline: none; 
-    border-color: var(--primary); 
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); 
-}
+/* --- NOWE STYLE DO CENNIKA USŁUG --- */
+.service-price-box { background: #ecfdf5; border: 1px dashed var(--primary); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+.price-input-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.card-price-table { margin: 0 16px 16px 16px; padding: 12px; background: #f9fafb; border-radius: 10px; border: 1px solid #e5e7eb; }
+.price-line { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 4px 0; }
+.price-line b { color: var(--primary); }
