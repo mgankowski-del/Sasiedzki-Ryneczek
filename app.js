@@ -238,7 +238,7 @@ const renderListingsUI = () => {
 };
 
 // ==========================================
-// NASŁUCHIWANIE BAZY (Z NAPRAWIONYM SORTOWANIEM)
+// NASŁUCHIWANIE BAZY I INTELIGENTNE SORTOWANIE
 // ==========================================
 onSnapshot(collection(db, "listings"), (snap) => {
     const now = new Date();
@@ -250,8 +250,25 @@ onSnapshot(collection(db, "listings"), (snap) => {
         allListingsData.push({ id: docSnap.id, data: d });
     });
 
-    // ROZWIĄZANIE PROBLEMU BRAKUJĄCYCH OFERT: Sortowanie bezpośrednio w JavaScript
+    // Sortowanie z uwzględnieniem wyprzedanych ofert
     allListingsData.sort((a, b) => {
+        // 1. Funkcja sprawdzająca, czy ogłoszenie jest całkowicie wyprzedane
+        const isSoldOut = (offer) => {
+            // Jeśli nie ma produktów do odliczania (np. sama wizytówka z cennikiem) - nie jest wyprzedane
+            if (!offer.items || offer.items.length === 0) return false;
+            // Sprawdzamy, czy KAŻDY produkt w ofercie ma 0 (lub mniej) dostępnych sztuk
+            return offer.items.every(it => getRem(it.name, it.totalQty, offer.reservations) <= 0);
+        };
+
+        const aSold = isSoldOut(a.data);
+        const bSold = isSoldOut(b.data);
+
+        // Jeśli A jest wyprzedane, a B nie - A spada na dół
+        if (aSold && !bSold) return 1;
+        // Jeśli B jest wyprzedane, a A nie - B spada na dół (A zostaje wyżej)
+        if (!aSold && bSold) return -1;
+
+        // 2. Jeśli oba mają ten sam status (oba aktywne lub oba wyprzedane), sortujemy po dacie (najnowsze wyżej)
         const dateA = a.data.createdAt?.toDate ? a.data.createdAt.toDate() : new Date(a.data.createdAt || 0);
         const dateB = b.data.createdAt?.toDate ? b.data.createdAt.toDate() : new Date(b.data.createdAt || 0);
         return dateB - dateA;
