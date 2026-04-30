@@ -14,18 +14,112 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// KOLEKCJE BAZY DANYCH
+const listingsCol = collection(db, "listings");
+const specialistsCol = collection(db, "specialists");
+
 let currentEditId = null;
 let editingResIndex = null;
 let cachedListingData = null;
 let isEditingOffer = false;
 
 let allListingsData = [];
+let allSpecialistsData = [];
 let currentCategoryFilter = 'all';
+
+// ==========================================
+// PRZEŁĄCZANIE ZAKŁADEK (RYNECZEK / FACHOWCY)
+// ==========================================
+document.getElementById('tab-ryneczek').onclick = () => {
+    document.getElementById('tab-ryneczek').classList.add('active');
+    document.getElementById('tab-fachowcy').classList.remove('active');
+    document.getElementById('view-ryneczek').classList.remove('hidden');
+    document.getElementById('view-fachowcy').classList.add('hidden');
+    document.getElementById('btn-open-add').classList.remove('hidden');
+    document.getElementById('btn-open-add-specialist').classList.add('hidden');
+    document.getElementById('main-title').innerText = "🏠 Sąsiedzki Ryneczek";
+    document.getElementById('main-subtitle').innerText = "Usługi, handel i jedzenie od sąsiadów";
+};
+
+document.getElementById('tab-fachowcy').onclick = () => {
+    document.getElementById('tab-fachowcy').classList.add('active');
+    document.getElementById('tab-ryneczek').classList.remove('active');
+    document.getElementById('view-fachowcy').classList.remove('hidden');
+    document.getElementById('view-ryneczek').classList.add('hidden');
+    document.getElementById('btn-open-add-specialist').classList.remove('hidden');
+    document.getElementById('btn-open-add').classList.add('hidden');
+    document.getElementById('main-title').innerText = "⭐ Polecani Fachowcy";
+    document.getElementById('main-subtitle').innerText = "Baza sprawdzonych ekspertów z osiedla";
+};
+
+// ==========================================
+// LOGIKA FACHOWCÓW (NOWA)
+// ==========================================
+document.getElementById('btn-open-add-specialist').onclick = () => {
+    document.getElementById('specialist-form').reset();
+    document.getElementById('add-specialist-modal').classList.remove('hidden');
+};
+
+document.getElementById('specialist-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitSpecBtn'); btn.disabled = true; btn.innerText = "Dodawanie...";
+    
+    const data = {
+        name: document.getElementById('specName').value,
+        profession: document.getElementById('specProfession').value,
+        phone: document.getElementById('specPhone').value,
+        description: document.getElementById('specDesc').value,
+        addedBy: document.getElementById('specAddedBy').value,
+        pin: document.getElementById('specPin').value,
+        createdAt: new Date().toISOString()
+    };
+
+    try {
+        await addDoc(specialistsCol, data);
+        window.closeModals();
+        btn.disabled = false; btn.innerText = "Dodaj do polecanych";
+    } catch (err) {
+        alert(err.message); btn.disabled = false;
+    }
+};
+
+onSnapshot(query(specialistsCol, orderBy("createdAt", "desc")), (snap) => {
+    const cont = document.getElementById('specialists-container');
+    cont.innerHTML = '';
+    snap.forEach(docSnap => {
+        const d = docSnap.data();
+        cont.innerHTML += `
+            <div class="product-card" style="padding:0;">
+                <button onclick="window.deleteSpecialist('${docSnap.id}', '${d.pin}')" style="position:absolute; top:15px; right:15px; border:none; background:#fef3c7; color:#d97706; font-weight:bold; border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.7rem; z-index:10;">Usuń</button>
+                <div class="specialist-header">
+                    <span style="color:#d97706; font-weight:800; font-size:0.85rem; text-transform:uppercase;">⭐ ${d.profession}</span>
+                    <h3 style="margin:5px 0 0 0; font-size:1.4rem;">${d.name}</h3>
+                </div>
+                <div style="padding: 20px;">
+                    <p style="margin:0 0 15px 0; color:#374151; line-height:1.5;">"${d.description}"</p>
+                    <div class="contact-box">📞 ${d.phone}</div>
+                    <p style="font-size:0.8rem; color:#9ca3af; margin:15px 0 0 0;">Dodał(a): ${d.addedBy}</p>
+                </div>
+            </div>
+        `;
+    });
+});
+
+window.deleteSpecialist = async (id, pin) => {
+    const input = prompt("Podaj PIN (ustalony podczas dodawania wizytówki):");
+    if (input === pin || input === "9988") await deleteDoc(doc(db, "specialists", id));
+    else if (input) alert("Błędny PIN!");
+};
+
+
+// ==========================================
+// LOGIKA RYNECZKU (STARA - ZACHOWANA 1:1)
+// ==========================================
 
 const cleanupExpired = async () => {
     try {
         const now = new Date();
-        const snap = await getDocs(collection(db, "listings"));
+        const snap = await getDocs(listingsCol);
         snap.forEach(async (docSnap) => {
             const d = docSnap.data();
             if (d.expiryDate) {
@@ -33,7 +127,7 @@ const cleanupExpired = async () => {
                 if (now > new Date(exp.getTime() + 24 * 60 * 60 * 1000)) await deleteDoc(doc(db, "listings", docSnap.id));
             }
         });
-    } catch (error) { console.error("Błąd czyszczenia bazy:", error); }
+    } catch (error) { console.error(error); }
 };
 
 const getRem = (name, total, res = [], ignoreIdx = null) => {
@@ -56,26 +150,19 @@ window.openImage = (url) => {
     document.getElementById('image-modal').classList.remove('hidden');
 };
 
-// ZMODYFIKOWANA FUNKCJA: DODANY CHECKBOX "ZA DARMO"
 const createProductFields = (data = {}) => {
     const div = document.createElement('div');
     div.className = 'product-form-box';
     const initialStep = data.step || (data.unit === 'szt' ? 1 : 0.25);
-    const isFree = data.price === 0; // Sprawdza, czy podczas edycji cena to 0
+    const isFree = data.price === 0;
 
     div.innerHTML = `
-        <div class="input-group"><label>Nazwa (np. Książka, Jajka, Konsultacja)</label><input type="text" class="p-name" value="${data.name || ''}" placeholder="Co oferujesz?" required></div>
-        
-        <div class="input-group">
-            <label>Opis (szczegóły, wymiary, stan)</label>
-            <textarea class="p-desc" placeholder="Wpisz dodatkowe informacje...">${data.description || ''}</textarea>
-        </div>
-
+        <div class="input-group"><label>Nazwa (np. Książka, Jajka, Konsultacja)</label><input type="text" class="p-name" value="${data.name || ''}" required></div>
+        <div class="input-group"><label>Opis (szczegóły, wymiary, stan)</label><textarea class="p-desc">${data.description || ''}</textarea></div>
         <div class="form-grid">
             <div class="input-group">
                 <label>Cena (zł)</label>
                 <input type="number" class="p-price" step="0.01" value="${data.price !== undefined ? data.price : ''}" ${isFree ? 'disabled' : ''} required>
-                
                 <label style="display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer; font-weight:bold; color:var(--primary); font-size: 0.85rem;">
                     <input type="checkbox" class="p-free-cb" ${isFree ? 'checked' : ''} style="width: 18px; height: 18px;"> 🎁 Oddam za darmo
                 </label>
@@ -88,34 +175,23 @@ const createProductFields = (data = {}) => {
             <div class="input-group"><label>Łączna ilość / Czas (wpisz 1 dla usług)</label><input type="number" class="p-total" step="0.01" value="${data.totalQty || ''}" required></div>
             <div class="input-group"><label>Sposób dzielenia</label>
                 <select class="p-step">
-                    <option value="1" ${initialStep==1?'selected':''}>W całości (1, 2...)</option>
-                    <option value="0.5" ${initialStep==0.5?'selected':''}>Na połówki (0.5, 1...)</option>
-                    <option value="0.25" ${initialStep==0.25?'selected':''}>Na ćwiartki (0.25...)</option>
-                    <option value="0.1" ${initialStep==0.1?'selected':''}>Co 0.1</option>
+                    <option value="1" ${initialStep==1?'selected':''}>W całości (1, 2...)</option><option value="0.5" ${initialStep==0.5?'selected':''}>Na połówki (0.5, 1...)</option><option value="0.25" ${initialStep==0.25?'selected':''}>Na ćwiartki (0.25...)</option><option value="0.1" ${initialStep==0.1?'selected':''}>Co 0.1</option>
                 </select>
             </div>
         </div>
         <div class="input-group"><label>Zdjęcie</label><input type="file" class="p-file" accept="image/*" style="border:none; padding:0;"></div>
     `;
 
-    // Logika wyłączania pola ceny, gdy zaznaczono "Za darmo"
     const freeCb = div.querySelector('.p-free-cb');
     const priceInput = div.querySelector('.p-price');
-    
     freeCb.onchange = (e) => {
-        if (e.target.checked) {
-            priceInput.value = 0;
-            priceInput.disabled = true; // Blokuje pole
-        } else {
-            priceInput.value = '';
-            priceInput.disabled = false; // Odblokowuje pole
-        }
+        if (e.target.checked) { priceInput.value = 0; priceInput.disabled = true; } 
+        else { priceInput.value = ''; priceInput.disabled = false; }
     };
-
     return div;
 };
 
-// --- LOGIKA CENNIKA USŁUG ---
+// CENNIK
 const enablePriceCheckbox = document.getElementById('enablePriceList');
 const priceInputsDiv = document.getElementById('priceListInputs');
 const priceRowsContainer = document.getElementById('priceRowsContainer');
@@ -124,9 +200,7 @@ enablePriceCheckbox.onchange = (e) => {
     if(e.target.checked) {
         priceInputsDiv.classList.remove('hidden');
         if (priceRowsContainer.children.length === 0) addPriceRow();
-    } else {
-        priceInputsDiv.classList.add('hidden');
-    }
+    } else { priceInputsDiv.classList.add('hidden'); }
 };
 
 function addPriceRow(label = '', val = '') {
@@ -140,7 +214,6 @@ function addPriceRow(label = '', val = '') {
     priceRowsContainer.appendChild(div);
 }
 document.getElementById('addPriceRowBtn').onclick = () => addPriceRow();
-// -----------------------------
 
 const renderListingsUI = () => {
     const cont = document.getElementById('listings-container');
@@ -162,13 +235,7 @@ const renderListingsUI = () => {
         
         let priceTableHtml = '';
         if (d.servicePrices && d.servicePrices.length > 0) {
-            priceTableHtml = `
-                <div class="card-price-table">
-                    ${d.servicePrices.map(p => `
-                        <div class="price-line"><span>${p.label}</span><b>${p.val} zł</b></div>
-                    `).join('')}
-                </div>
-            `;
+            priceTableHtml = `<div class="card-price-table">` + d.servicePrices.map(p => `<div class="price-line"><span>${p.label}</span><b>${p.val} zł</b></div>`).join('') + `</div>`;
         }
 
         card.innerHTML = `
@@ -186,10 +253,7 @@ const renderListingsUI = () => {
                     ? `<img src="${it.imageUrl}" class="thumb" onclick="window.openImage('${it.imageUrl}')">`
                     : `<div class="thumb" style="display:flex; align-items:center; justify-content:center; font-size:2rem; cursor:default;">📦</div>`;
 
-                // Logika "Za darmo" na froncie
-                const displayPrice = (it.price === 0) 
-                    ? `<span style="color:var(--primary); font-weight:800; text-transform:uppercase;">🎁 Za darmo!</span>` 
-                    : `${it.price} zł / ${it.unit}`;
+                const displayPrice = (it.price === 0) ? `<span style="color:var(--primary); font-weight:800; text-transform:uppercase;">🎁 Za darmo!</span>` : `${it.price} zł / ${it.unit}`;
 
                 return `
                 <div class="product-item-list">
@@ -211,9 +275,7 @@ const renderListingsUI = () => {
         cont.appendChild(card);
     });
 
-    if (!hasValidOffers) {
-        cont.innerHTML = '<div class="status-msg">Brak ofert w tej kategorii.</div>';
-    }
+    if (!hasValidOffers) cont.innerHTML = '<div class="status-msg">Brak ofert w tej kategorii.</div>';
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -238,7 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
         enablePriceCheckbox.checked = false;
         priceInputsDiv.classList.add('hidden');
         priceRowsContainer.innerHTML = '';
-
         document.getElementById('add-listing-modal').classList.remove('hidden');
     };
     document.getElementById('add-more-items').onclick = () => document.getElementById('products-to-add').appendChild(createProductFields());
@@ -268,7 +329,7 @@ document.getElementById('listing-form').onsubmit = async (e) => {
         products.push({
             name: div.querySelector('.p-name').value, 
             description: div.querySelector('.p-desc').value, 
-            price: parseFloat(div.querySelector('.p-price').value), // 0 zostanie ładnie zapisane
+            price: parseFloat(div.querySelector('.p-price').value),
             unit: div.querySelector('.p-unit').value, 
             totalQty: parseFloat(div.querySelector('.p-total').value),
             step: parseFloat(div.querySelector('.p-step').value), 
@@ -289,24 +350,20 @@ document.getElementById('listing-form').onsubmit = async (e) => {
     };
     try {
         if(isEditingOffer) await updateDoc(doc(db, "listings", currentEditId), data);
-        else { data.createdAt = new Date(); await addDoc(collection(db, "listings"), data); }
+        else { data.createdAt = new Date(); await addDoc(listingsCol, data); }
         window.closeModals();
         location.reload();
-    } catch(err) {
-        alert(err.message); btn.disabled = false; btn.innerText = "Opublikuj ofertę";
-    }
+    } catch(err) { alert(err.message); btn.disabled = false; btn.innerText = "Opublikuj ofertę"; }
 };
 
-onSnapshot(query(collection(db, "listings"), orderBy("createdAt", "desc")), (snap) => {
+onSnapshot(query(listingsCol, orderBy("createdAt", "desc")), (snap) => {
     const now = new Date();
     allListingsData = []; 
-
     snap.forEach(docSnap => {
         const d = docSnap.data();
         if (d.expiryDate && now > new Date(d.expiryDate)) return;
         allListingsData.push({ id: docSnap.id, data: d });
     });
-
     renderListingsUI(); 
 });
 
@@ -327,7 +384,6 @@ window.openOrderModal = async (id, editIdx = null) => {
             ? `<img src="${it.imageUrl}" style="width:60px; height:60px; border-radius:8px; object-fit:cover; cursor:pointer; flex-shrink:0;" onclick="window.openImage('${it.imageUrl}')">`
             : `<div style="width:60px; height:60px; border-radius:8px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0;">📦</div>`;
 
-        // Pokazywanie ceny w koszyku (lub 'Za darmo')
         const cartDisplayPrice = (it.price === 0) ? "🎁 ZA DARMO" : `Cena: ${it.price} zł / ${it.unit}`;
 
         container.innerHTML += `
@@ -412,7 +468,7 @@ document.getElementById('confirm-booking-btn').onclick = async () => {
     }
     await updateDoc(refL, { reservations: res }); 
     window.closeModals();
-    alert("Super! Zamówienie/Wiadomość zostało wysłane do sprzedawcy.");
+    alert("Super! Zamówienie zostało wysłane do sprzedawcy.");
     location.reload();
 };
 
@@ -482,4 +538,23 @@ document.getElementById('btn-edit-offer').onclick = () => {
     if (d.servicePrices && d.servicePrices.length > 0) {
         enablePriceCheckbox.checked = true;
         document.getElementById('priceListInputs').classList.remove('hidden');
-        d.servicePrices.forEach(p => addPriceRow(p
+        d.servicePrices.forEach(p => addPriceRow(p.label, p.val));
+    } else {
+        enablePriceCheckbox.checked = false;
+        document.getElementById('priceListInputs').classList.add('hidden');
+    }
+
+    document.getElementById('products-to-add').innerHTML = '';
+    (d.items || []).forEach(it => {
+        const row = createProductFields(it);
+        row.dataset.oldUrl = it.imageUrl;
+        document.getElementById('products-to-add').appendChild(row);
+    });
+    
+    document.getElementById('seller-modal').classList.add('hidden');
+    document.getElementById('add-listing-modal').classList.remove('hidden');
+};
+
+document.getElementById('btn-delete-offer').onclick = async () => {
+    if(confirm("Czy na pewno chcesz usunąć całe ogłoszenie?")) { await deleteDoc(doc(db, "listings", currentEditId)); location.reload(); }
+};

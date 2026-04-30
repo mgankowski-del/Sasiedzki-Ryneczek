@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kort Tenisowy - Ryneczek</title>
+    <title>Sąsiedzki Ryneczek - Triton Country</title>
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="icon" href="apple-touch-icon.png">
     <link rel="stylesheet" href="style.css">
@@ -11,19 +11,32 @@
 <body>
     <div class="app-container">
         <header class="main-header">
-            <h1>🏠 Sąsiedzki Ryneczek</h1>
-            <p class="subtitle">Usługi, handel i jedzenie od sąsiadów</p>
+            <div class="main-tabs-container">
+                <button id="tab-ryneczek" class="main-tab active">🛒 Ryneczek</button>
+                <button id="tab-fachowcy" class="main-tab">⭐ Fachowcy</button>
+            </div>
+
+            <h1 id="main-title" style="margin-top: 15px;">🏠 Sąsiedzki Ryneczek</h1>
+            <p class="subtitle" id="main-subtitle">Usługi, handel i jedzenie od sąsiadów</p>
+            
             <button id="btn-open-add" class="btn-add-main">+ Wystaw ogłoszenie / usługę</button>
+            <button id="btn-open-add-specialist" class="btn-add-main hidden" style="background:#f59e0b;">+ Poleć sprawdzonego fachowca</button>
         </header>
 
-        <div class="category-filters">
-            <button class="filter-btn active" data-cat="all">Wszystko</button>
-            <button class="filter-btn" data-cat="🛍️ Sprzedaż">🛍️ Sprzedaż</button>
-            <button class="filter-btn" data-cat="🍕 Jedzenie">🍕 Jedzenie</button>
-            <button class="filter-btn" data-cat="🛠️ Usługi">🛠️ Usługi</button>
+        <div id="view-ryneczek">
+            <div class="category-filters">
+                <button class="filter-btn active" data-cat="all">Wszystko</button>
+                <button class="filter-btn" data-cat="🎁 Za darmo">🎁 Za darmo</button>
+                <button class="filter-btn" data-cat="🛍️ Sprzedaż">🛍️ Sprzedaż</button>
+                <button class="filter-btn" data-cat="🍕 Jedzenie">🍕 Jedzenie</button>
+                <button class="filter-btn" data-cat="🛠️ Usługi">🛠️ Usługi</button>
+            </div>
+            <div id="listings-container"></div>
         </div>
 
-        <div id="listings-container"></div>
+        <div id="view-fachowcy" class="hidden">
+            <div id="specialists-container"></div>
+        </div>
     </div>
 
     <div id="add-listing-modal" class="modal hidden">
@@ -37,6 +50,7 @@
                         <label>Kategoria</label>
                         <select id="category">
                             <option value="🛍️ Sprzedaż">🛍️ Sprzedaż (rzeczy, przedmioty)</option>
+                            <option value="🎁 Za darmo">🎁 Za darmo (oddam rzeczy)</option>
                             <option value="🍕 Jedzenie">🍕 Jedzenie (wypieki, obiady)</option>
                             <option value="🛠️ Usługi">🛠️ Usługi (naprawy, pomoc, lekcje)</option>
                         </select>
@@ -64,8 +78,7 @@
                 </div>
 
                 <div class="form-section">
-                    <h3>Zdjęcia i stany magazynowe (dla rzeczy)</h3>
-                    <p style="font-size: 0.8rem; color: #6b7280; margin-bottom: 10px;">Jeśli oferujesz usługę (i wypełniłeś cennik wyżej), możesz zostawić jedno pole i wpisać np. "1 szt". Jeśli sprzedajesz rzeczy - dodaj zdjęcia i ilość.</p>
+                    <h3>Zdjęcia i stany magazynowe</h3>
                     <div id="products-to-add"></div>
                     <button type="button" id="add-more-items" class="btn-secondary-action">+ Dodaj kolejny przedmiot ze zdjęciem</button>
                 </div>
@@ -77,25 +90,42 @@
         </div>
     </div>
 
+    <div id="add-specialist-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn" onclick="window.closeModals()">&times;</span>
+            <h2>Poleć fachowca</h2>
+            <p style="font-size:0.85rem; color:#6b7280; margin-bottom:20px;">Podziel się kontaktem do sprawdzonego eksperta.</p>
+            
+            <form id="specialist-form">
+                <div class="form-section">
+                    <div class="input-group"><label>Kogo polecasz? (Imię / Nazwa firmy)</label><input type="text" id="specName" placeholder="np. Hydraulik Jan" required></div>
+                    <div class="input-group"><label>Zawód / Specjalizacja</label><input type="text" id="specProfession" placeholder="np. Hydraulik, Sprzątanie" required></div>
+                    <div class="input-group"><label>Numer telefonu fachowca</label><input type="tel" id="specPhone" required></div>
+                    <div class="input-group"><label>Dlaczego polecasz? (Krótka opinia)</label><textarea id="specDesc" placeholder="Szybko, sprawnie i tanio. Robił nam łazienkę..." required></textarea></div>
+                    
+                    <div class="form-grid" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                        <div class="input-group"><label>Kto poleca? (Twoje imię)</label><input type="text" id="specAddedBy" required></div>
+                        <div class="input-group"><label>Twój PIN (do usunięcia)</label><input type="number" id="specPin" required></div>
+                    </div>
+                </div>
+                <button type="submit" id="submitSpecBtn" class="btn-add-main" style="background:#f59e0b;">Dodaj do polecanych</button>
+            </form>
+        </div>
+    </div>
+
     <div id="reservation-modal" class="modal hidden">
         <div class="modal-content">
             <span class="close-btn" onclick="window.closeModals()">&times;</span>
             <h2>Zarezerwuj / Zamów</h2>
             <p id="modal-pickup-info" style="font-size:0.9rem; color:#6b7280; margin-bottom:15px;"></p>
             <div id="modal-order-items"></div>
-            
             <div class="total-bar"> Suma z koszyka: <span id="modal-total-price">0</span> zł </div>
-            <p style="font-size: 0.8rem; color: #6b7280; margin-bottom: 15px;">*Jeśli zamawiasz usługę z cennika, kwota zależy od indywidualnych ustaleń.</p>
-
             <div class="form-section">
                 <div class="input-group"><label>Twoje Imię</label><input type="text" id="buyerName"></div>
-                <div class="form-grid">
-                    <div class="input-group"><label>Telefon</label><input type="tel" id="buyerPhone"></div>
-                    <div class="input-group"><label>Twój PIN</label><input type="number" id="buyerPin"></div>
-                </div>
+                <div class="form-grid"><div class="input-group"><label>Telefon</label><input type="tel" id="buyerPhone"></div><div class="input-group"><label>Twój PIN</label><input type="number" id="buyerPin"></div></div>
                 <div class="input-group"><label>Kiedy skorzystasz/odbierzesz?</label><input type="text" id="buyerPickupTime"></div>
             </div>
-            <button id="confirm-booking-btn" class="btn-add-main">Wyślij zamówienie</button>
+            <button id="confirm-booking-btn" class="btn-add-main">Wyślij rezerwację</button>
         </div>
     </div>
 
@@ -103,15 +133,9 @@
         <div class="modal-content">
             <span class="close-btn" onclick="window.closeModals()">&times;</span>
             <h2>Zarządzanie ofertą</h2>
-            <div class="tabs">
-                <button class="tab active" id="view-by-person">Zamówienia</button>
-                <button class="tab" id="view-by-product">Magazyn</button>
-            </div>
+            <div class="tabs"><button class="tab active" id="view-by-person">Zamówienia</button><button class="tab" id="view-by-product">Magazyn</button></div>
             <div id="reservations-container"></div>
-            <div style="margin-top:20px; display:flex; gap:10px;">
-                <button id="btn-edit-offer" class="btn-warning-action">Edytuj</button>
-                <button id="btn-delete-offer" class="btn-danger-action">Usuń wszystko</button>
-            </div>
+            <div style="margin-top:20px; display:flex; gap:10px;"><button id="btn-edit-offer" class="btn-warning-action">Edytuj</button><button id="btn-delete-offer" class="btn-danger-action">Usuń wszystko</button></div>
         </div>
     </div>
 
